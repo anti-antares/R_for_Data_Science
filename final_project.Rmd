@@ -1,0 +1,21 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+library(DataExplorer)
+library(tidyverse)
+library(randomForest)
+library(gbm)
+library(caret)
+library(e1071)
+library(dbplyr)
+
+final_data<- read_csv(file = "Train.csv")
+plot_missing(final_data)
+```
+
+
