@@ -1,0 +1,16 @@
+---
+title: "Final project proposal"
+output: html_notebook
+---
+
+
+
+1. Costa Rican Household Poverty Level Prediction https://www.kaggle.com/c/costa-rican-household-poverty-prediction
+2. Zillow Home Value Prediction https://www.kaggle.com/c/zillow-prize-1/data
+3. Walmart Recruiting https://www.kaggle.com/c/walmart-recruiting-trip-type-classification
+
+
+
+
+
+## Private bookmark https://www.kaggle.com/c/landmark-recognition-challenge/rules https://www.kaggle.com/c/transfer-learning-on-stack-exchange-tags
