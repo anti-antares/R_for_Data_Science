@@ -15,6 +15,7 @@ library(e1071)
 library(dbplyr)
 
 final_data<- read_csv(file = "Train.csv")
+plot_str(final_data)
 plot_missing(final_data)
 ```
 
