@@ -1,0 +1,70 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+library(DataExplorer)
+library(tidyverse)
+library(randomForest)
+library(gbm)
+library(caret)
+library(e1071)
+library(dbplyr)
+
+poverty<- read_csv(file = "../input/train.csv")
+poverty_test<-read_csv(file="../input/test.csv")
+poverty_test_id <- poverty_test %>%
+  #mutate(Target = as.factor(Target)) %>% 
+  select(Id) 
+#  na.omit()
+#plot_missing(final_data)
+
+p11 <- ggplot(poverty, aes(x = as.factor(Target), y = rooms)) +
+  geom_boxplot() +
+  coord_flip()+
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange( p11)
+```
+```{r}
+plot_boxplot(poverty, by = "Target")
+```
+
+```{r}
+poverty <- poverty %>%
+  mutate(Target = as.factor(Target)) %>% 
+  select(-dependency,-Id,-idhogar,-v2a1,-v18q1,-rez_esc,-elimbasu5) %>% 
+  na.omit()
+#glimpse(poverty)
+poverty_test <- poverty_test %>%
+  #mutate(Target = as.factor(Target)) %>% 
+  select(-dependency,-idhogar,-v2a1,-v18q1,-rez_esc) %>% 
+  na.omit()
+#glimpse(poverty)
+
+```
+```{r}
+set.seed(22)
+poverty_gbm <- expand.grid(interaction.depth = 5,
+                        n.trees = 100,
+                        shrinkage = 0.1,
+                        n.minobsinnode = 10)
+#tc=trainControl(verboseIter=TRUE)
+final_Gbm <- train(Target ~., data = poverty, method = "gbm",
+                   tuneGrid = poverty_gbm,
+                   verbose = TRUE)
+
+pred_Gbm <- predict(object = final_Gbm, newdata = poverty_test)
+
+poverty_test_id<-poverty_test %>% 
+  select(Id)
+#pred_Gbm
+#poverty_test_id
+result=data.frame(poverty_test_id,pred_Gbm)
+colnames(result)=c("Id","Target")
+write.csv2(result,"submission.csv",row.names=FALSE)
+```
+
+
