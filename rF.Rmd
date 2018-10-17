@@ -1,0 +1,117 @@
+---
+title: "EDA and Random Forest"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(tidyverse)
+library(caret)
+library(ggplot2)
+library(randomForest)
+library(scales)
+library(reshape2)
+library(e1071)
+library(DataExplorer)
+
+poverty=read_csv("Train.csv")
+poverty_test=read_csv("test.csv")
+```
+
+```{r}
+poverty_missing=poverty %>%  select(everything()) %>% summarise_all(funs(sum(is.na(.)))) %>% gather(variables,missing_amount) %>% mutate(percent=missing_amount/nrow(poverty)) %>% 
+  arrange(percent) %>% mutate(levels=case_when(percent>=0.8~"Remove",
+                                              percent>=0.4 & percent<0.8~"Bad",
+                                              percent>=0.05 & percent<0.4~"OK",
+                                              percent<0.05~"Good")) %>% filter(missing_amount>0)
+
+ggplot(poverty_missing, aes(x = reorder(variables, -percent), y = missing_amount,fill=levels)) + geom_bar(stat = "identity") + coord_flip()+ scale_fill_manual(values=c("#1a9641", "#a6d96a", "#d7191c"))+ xlab("Features") + ylab("Number of missing rows") +   ggtitle("Missing variable plot")+ 
+  geom_text(aes(label = paste0(round(100 * percent, 2), "%"))) + scale_y_continuous(labels = comma)+theme(plot.title = element_text(hjust = 0.5)) 
+
+```
+
+```{r}
+corrma=round(cor(poverty %>% na.omit()%>% select_if(is.numeric)),2)
+melted_corrma <- melt(corrma) 
+ggplot(data = melted_corrma, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()+
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+   midpoint = 0, limit = c(-1,1), space = "Lab",name="Correlation Meter")
+
+```
+```{r}
+poverty_full = as_tibble(rbind(poverty %>% select(-Target), poverty_test))
+
+# Create a list of the features names that need to be reverse engineered
+
+feature_list = c(
+  "pared",
+  "piso",
+  "techo",
+  "abasta",
+  "sanitario",
+  "energcocinar",
+  "elimbasu",
+  "epared",
+  "etecho",
+  "eviv",
+  "estadocivil",
+  "parentesco",
+  "instlevel",
+  "tipovivi",
+  "lugar",
+  "area"
+)
+
+# Matrix to store our new features
+
+new_features_integer = data.frame(matrix(ncol = length(feature_list), nrow = nrow(poverty)))
+
+# Cycle through and reverse the OHE process for these
+
+ohe_names = vector()
+
+for(i in 1:length(feature_list)){
+  
+  # Grab the feature
+  
+  feature_to_fix = poverty %>% select(starts_with(feature_list[i]))
+  
+  # Fix and enter into our new feature matrix
+  
+  new_features_integer[,i] = as.integer(factor(names(feature_to_fix)[max.col(feature_to_fix)], ordered = FALSE))
+  names(new_features_integer)[i] = paste0(feature_list[i],"_int")
+  
+  ohe_names = c(ohe_names, as.vector(names(feature_to_fix)))
+  
+}
+for(i in 1:length(feature_list)){
+  poverty =poverty %>% select(-starts_with(feature_list[i]))
+}
+
+poverty=as_tibble(cbind(poverty , new_features_integer))
+```
+
+
+```{r}
+poverty_rf=poverty %>% select(-v2a1,-v18q1,-rez_esc,-Id,-idhogar) %>% na.omit()
+poverty_rf$Target=as.factor(poverty_rf$Target)
+#control <- trainControl(method="repeatedcv", number=10, repeats=3)
+tTrace=trainControl(verboseIter = TRUE)
+seed <- 7
+metric <- "Accuracy"
+set.seed(seed)
+mtry <- sqrt(ncol(poverty_rf))
+tunegrid <- expand.grid(.mtry=mtry)
+
+rf_fit <- train(Target ~ ., data = poverty_rf, method = "rf", metric = "Accuracy",
+                tuneGrid=tunegrid，trControl=tTrace)
+
+print(rf_fit)
+save(rf_fit，file="rf_fit.rda")
+
+```
+
