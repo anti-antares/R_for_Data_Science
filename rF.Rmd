@@ -16,6 +16,7 @@ library(scales)
 library(reshape2)
 library(e1071)
 library(DataExplorer)
+library(corrplot)
 
 poverty=read_csv("Train.csv")
 poverty_test=read_csv("test.csv")
@@ -33,6 +34,7 @@ ggplot(poverty_missing, aes(x = reorder(variables, -percent), y = missing_amount
 
 ```
 
+
 ```{r}
 corrma=round(cor(poverty %>% na.omit()%>% select_if(is.numeric)),2)
 melted_corrma <- melt(corrma) 
@@ -40,6 +42,7 @@ ggplot(data = melted_corrma, aes(x=Var1, y=Var2, fill=value)) +
   geom_tile()+
  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
    midpoint = 0, limit = c(-1,1), space = "Lab",name="Correlation Meter")
+
 
 ```
 ```{r}
@@ -97,21 +100,57 @@ poverty=as_tibble(cbind(poverty , new_features_integer))
 
 
 ```{r}
-poverty_rf=poverty %>% select(-v2a1,-v18q1,-rez_esc,-Id,-idhogar) %>% na.omit()
+impute.mean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
+poverty_rf=poverty %>% select(-v2a1,-v18q1,-rez_esc,-Id,-idhogar,-dependency) %>% mutate(SQBmeaned=impute.mean(SQBmeaned),
+                                                                                         meaneduc=impute.mean(meaneduc))
 poverty_rf$Target=as.factor(poverty_rf$Target)
 #control <- trainControl(method="repeatedcv", number=10, repeats=3)
 tTrace=trainControl(verboseIter = TRUE)
 seed <- 7
 metric <- "Accuracy"
 set.seed(seed)
-mtry <- sqrt(ncol(poverty_rf))
+mtry <- 106
 tunegrid <- expand.grid(.mtry=mtry)
 
-rf_fit <- train(Target ~ ., data = poverty_rf, method = "rf", metric = "Accuracy",
-                tuneGrid=tunegrid，trControl=tTrace)
+rf_fit2 <- train(Target ~ ., data = poverty_rf, method = "rf", metric = "Accuracy",
+                tunegrid=tunegrid，trControl=tTrace)
 
-print(rf_fit)
-save(rf_fit，file="rf_fit.rda")
+print(rf_fit2)
+save(rf_fit2，file="rf_fit2.rda")
+#load("rf_fit2.rda")
+```
 
+```{r}
+new_features_integer = data.frame(matrix(ncol = length(feature_list), nrow = nrow(poverty_test)))
+
+# Cycle through and reverse the OHE process for these
+
+ohe_names = vector()
+
+for(i in 1:length(feature_list)){
+  
+  # Grab the feature
+  
+  feature_to_fix = poverty_test %>% select(starts_with(feature_list[i]))
+  
+  # Fix and enter into our new feature matrix
+  
+  new_features_integer[,i] = as.integer(factor(names(feature_to_fix)[max.col(feature_to_fix)], ordered = FALSE))
+  names(new_features_integer)[i] = paste0(feature_list[i],"_int")
+  
+  ohe_names = c(ohe_names, as.vector(names(feature_to_fix)))
+  
+}
+for(i in 1:length(feature_list)){
+  poverty_test =poverty_test %>% select(-starts_with(feature_list[i]))
+}
+
+poverty_test=as_tibble(cbind(poverty_test , new_features_integer))
+poverty_test=poverty_test%>% select(-v2a1,-v18q1,-rez_esc,-idhogar,-dependency) %>% mutate(SQBmeaned=impute.mean(SQBmeaned),
+                                                                                         meaneduc=impute.mean(meaneduc))
+pred <- predict(rf_fit2, newdata=poverty_test)
+result=data.frame(poverty_test$Id,pred)
+colnames(result)=c("Id","Target")
+write.csv(result,"Result.csv",row.names=FALSE)
 ```
 
