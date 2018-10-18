@@ -1,0 +1,122 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+EDA:First, let's see among the 142 variables, which variables have the high relations with the degree of poverty(described as the variable called "Target"). For the first step, we can draw the boxplots of all the 142 variables to see their relations with Target. After that, we can pick some variables to draw more precise boxplots and scatterplots and we notice that years of schooling(described as the variable called escolari), and degree of crowding in the house(described as the variable called overcrowding) can have some trends with Target. Thus, they should be highly focused when doing the model.
+```{r, warning=FALSE}
+library(DataExplorer)
+library(tidyverse)
+library(randomForest)
+library(gbm)
+library(caret)
+library(e1071)
+library(dbplyr)
+
+poverty<- read_csv(file = "Train.csv")
+poverty_test<-read_csv(file="test.csv")
+
+plot_boxplot(poverty, by = "Target")
+
+p1 <- ggplot(poverty, aes(x = as.factor(Target), y = rooms)) +
+  geom_boxplot() +
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - number of rooms in house") +
+  theme(plot.title = element_text(hjust = 0.5, size = 7))
+p2 <- ggplot(poverty, aes(x = as.factor(Target), y = hogar_total)) +
+  geom_boxplot() +
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - number of total individual in household") +
+  theme(plot.title = element_text(hjust = 0.5, size = 5))
+p3 <- ggplot(poverty, aes(x = as.factor(Target), y = r4t2)) +
+  geom_boxplot() +
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - people with age >12") +
+  theme(plot.title = element_text(hjust = 0.5, size = 6))
+grid.arrange(p1,p2,p3,nrow=2)
+
+
+p4 <- ggplot(poverty, aes(x = as.factor(Target), y = SQBdependency)) +
+  geom_boxplot() +
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - dependency squared") +
+  theme(plot.title = element_text(hjust = 0.5, size = 6))
+p5 <- ggplot(poverty, aes(x = as.factor(Target), y = escolari)) +
+  geom_boxplot() +
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - year of schooling") +
+  theme(plot.title = element_text(hjust = 0.5, size = 6))
+p6 <- ggplot(poverty, aes(x = as.factor(Target), y = overcrowding)) +
+  geom_boxplot() +
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - degree of overcrowding") +
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(p4,p5,p6,nrow=2)
+
+p7 <- ggplot(poverty, aes(x = as.factor(Target), y = escolari)) +
+  geom_point(alpha = 0.01) +
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Scatterplot -  year of schooling") +
+  theme(plot.title = element_text(hjust = 0.5, size = 7))
+p8 <- ggplot(poverty, aes(x = as.factor(Target), y = overcrowding)) +
+  geom_point(alpha = 0.01) +
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Scatterplot - degree of overcrowding") +
+  theme(plot.title = element_text(hjust = 0.5, size = 5))
+
+grid.arrange(p7,p8,nrow=2)
+```
+
+
+```{r}
+poverty <- poverty %>%
+  mutate(Target = as.factor(Target)) %>% 
+  select(-dependency,-Id,-idhogar,-v2a1,-v18q1,-rez_esc,-SQBmeaned,-meaneduc)  
+#    for(i in 1:ncol(poverty)){
+#  poverty[is.na(poverty[,i]), i] <- mean(poverty[,i], na.rm = TRUE)
+#}
+#glimpse(poverty)
+poverty_test <- poverty_test %>%
+  #mutate(Target = as.factor(Target)) %>% 
+  select(-dependency,-idhogar,-v2a1,-v18q1,-rez_esc,-SQBmeaned,-meaneduc) 
+#    for(i in 1:ncol(poverty_test)){
+#  poverty_test[is.na(poverty_test[,i]), i] <- mean(poverty_test[,i], #na.rm = TRUE)
+#}
+#glimpse(poverty)
+
+```
+```{r}
+set.seed(22)
+poverty_gbm <- expand.grid(interaction.depth = 5,
+                        n.trees = 100,
+                        shrinkage = 0.1,
+                        n.minobsinnode = 10)
+#tc=trainControl(verboseIter=TRUE)
+final_Gbm <- train(Target ~., data = poverty, method = "gbm",
+                   tuneGrid = poverty_gbm,
+                   verbose = TRUE)
+
+save(final_Gbm,file="final_Gbm.rda")
+pred_Gbm <- predict(object = final_Gbm, newdata = poverty_test)
+print(final_Gbm)
+summary(final_Gbm)
+poverty_test_id<-poverty_test %>% 
+  select(Id)
+#pred_Gbm
+#poverty_test_id
+result=data.frame(poverty_test_id,pred_Gbm)
+colnames(result)=c("Id","Target")
+write.csv(result,"submission.csv",row.names=FALSE)
+#pp=read_csv(file="submission.csv")
+```
+
+
