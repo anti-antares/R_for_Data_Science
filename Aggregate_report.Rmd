@@ -15,6 +15,7 @@ library(corrplot)
 library(gridExtra)
 library(nnet)
 library(factoextra)
+library(gbm)
 
 poverty=read_csv("Train.csv")
 poverty_test=read_csv("test.csv")
@@ -296,7 +297,7 @@ poverty_pca_test$Target <-NULL
 ```
 
 Data Preparation
-```{r}
+```{r warning=FALSE, message=FALSE}
 #randomForest
 impute.zero <- function(x) replace(x, is.na(x), 0)
 poverty_rf=poverty %>% select(-v2a1,-v18q1,-rez_esc,-Id,-idhogar,-dependency,-edjefa) %>% mutate(SQBmeaned=impute.zero(SQBmeaned),
@@ -304,7 +305,7 @@ poverty_rf=poverty %>% select(-v2a1,-v18q1,-rez_esc,-Id,-idhogar,-dependency,-ed
 poverty_rf$Target=as.factor(poverty_rf$Target)
 
 #GBM
-poverty_gbm <- poverty %>%
+poverty_gbm <- read_csv("Train.csv") %>%
   mutate(Target = as.factor(Target)) %>% 
   select(-dependency,-Id,-idhogar,-v2a1,-v18q1,-rez_esc,-SQBmeaned,-meaneduc)  
 
@@ -320,8 +321,12 @@ poverty_rf_training=poverty_rf[inTraining,]
 poverty_rf_validation=poverty_rf[-inTraining,]
 
 inTraining <- createDataPartition(poverty$Target, p=0.7, list=FALSE)
-poverty_gbm_training=poverty[inTraining,]
-poverty_gbm_validation=poverty[-inTraining,]
+poverty_gbm_training=poverty_gbm[inTraining,]
+poverty_gbm_validation=poverty_gbm[-inTraining,]
+
+inTraining <-createDataPartition(poverty_pca_train$Target,p=0.7,list=FALSE)
+poverty_pca_train_training = poverty_pca_train[inTraining,]
+poverty_pca_train_validation = poverty_pca_train[-inTraining,]
 ```
 
 
@@ -360,11 +365,17 @@ confusionMatrix(data=pred_validation, poverty_rf_validation$Target)
 
 poverty_rf_test=poverty_test%>% select(-v2a1,-v18q1,-rez_esc,-idhogar,-dependency,-edjefa) %>% mutate(SQBmeaned=impute.zero(SQBmeaned),
                                                                                          meaneduc=impute.zero(meaneduc))
-pred <- predict(rf_fit2, newdata=poverty_rf_test)
+pred <- predict(rf_fit3, newdata=poverty_rf_test)
 result=data.frame(poverty_rf_test$Id,pred)
 colnames(result)=c("Id","Target")
 write.csv(result,"rf_submission.csv",row.names=FALSE)
 ```
+
+```{r}
+impvars <- varImp(rf_fit3)
+plot(impvars, main = "Variable Importance for Random Forest")
+```
+
 
 GBM
 ```{r}
@@ -376,21 +387,29 @@ GBM
 #final_Gbm <- train(Target ~., data = poverty_gbm_training, method = "gbm",
 #                   tuneGrid = poverty_gbm,
 #                   verbose = TRUE)
-
+poverty_gbm_test=read_csv("test.csv")%>%
+  select(-dependency,-idhogar,-v2a1,-v18q1,-rez_esc,-SQBmeaned,-meaneduc) 
 load("2final_Gbm_.rda")
 
 varImp(final_Gbm)
+```
+
+``` {r}
 impvars <- varImp(final_Gbm)
 plot(impvars, main = "Variable Importance for GBM")
+```
+
+``` {r}
 pred_Gbm <- predict(object = final_Gbm, newdata = poverty_gbm_validation, type = "raw")
 confusionMatrix(pred_Gbm, poverty_gbm_validation$Target)
 
 poverty_test_id<-poverty_test %>% 
   select(Id)
 
-result=data.frame(poverty_test_id,pred_Gbm)
+predTest_Gbm <- predict(object = final_Gbm, newdata = poverty_gbm_test, type = "raw")
+result=data.frame(poverty_test_id,predTest_Gbm)
 colnames(result)=c("Id","Target")
-write.csv(result,"submission.csv",row.names=FALSE)
+write.csv(result,"gbm_submission.csv",row.names=FALSE)
 
 ```
 
