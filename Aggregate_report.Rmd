@@ -1,6 +1,11 @@
+---
+title: "Final project: Costa Rican Household Poverty Level Prediction"
+author: "Zhexin Chen, Shuting You and Xiaodi Tao"
+date: October 19, 2018
+output: html_notebook
+---
 
-
-#Data Explore and Clean
+This is the final project for CMU 95_778 R for Data Science. The kaggle competition we choose is [Costa Rican Household Poverty Level Prediction](https://www.kaggle.com/c/costa-rican-household-poverty-prediction) held by the Intra-American Development Bank and Kaggle. The project GitLab repository is available [here](https://gitlab.com/antileo1992/95_778.final_project).
 
 ```{r warning=FALSE,message=FALSE}
 library(tidyverse)
@@ -21,6 +26,10 @@ poverty=read_csv("Train.csv")
 poverty_test=read_csv("test.csv")
 ```
 
+
+##Explore and Clean Data
+
+
 ```{r}
 introduce(poverty)
 ```
@@ -29,12 +38,48 @@ introduce(poverty)
 introduce(poverty_test)
 ```
 
+The datasets contain 142 features and 1 label (only for the training set). The datasets give comprehensive description of a household surveyed, and the features contain information about several aspects of important information of a household: including household finance, household items, house condition, family composition, education, and basic demographics. 
+
+Below is a list of some representative features:
+
+Household Finance:
+  v2a1, Monthly rent payment
+  ...
+  
+Household Items:
+  v18q1, number of tablets household owns
+  refrig, =1 if the household has refrigerator
+  ...
+  
+House Condition:
+  rooms,  number of all rooms in the house
+  paredblolad, =1 if predominant material on the outside wall is block or brick
+  ...
+  
+Family Composition:
+  hhsize, household size
+  tamviv, number of persons living in the household
+  hogar_adul, Number of adults in household
+  ...
+  
+Education:
+  instlevel1, =1 no level of education
+  ...
+  
 ```{r}
 table(poverty$Target)
 ```
+
+
 ```{r}
-ggplot(poverty)+geom_bar(aes(Target))+ggtitle("Distribution of Label Feature")+theme(plot.title = element_text(hjust = 0.5))+scale_y_continuous(labels = comma)
+ggplot(poverty)+geom_bar(aes(Target))+ggtitle("Distribution of Label")+theme(plot.title = element_text(hjust = 0.5))+scale_y_continuous(labels = comma)
 ```
+
+
+The label "Target" has 4 levels, coded as: "1", "2", "3" and "4", where “1” stands for extreme poverty and "4" stands for non vulnerable households.
+
+The training set has 9557 observations and the testing set has 23856 observations. In order to obtain a higher accuracy on the testing set, on the one hand, our model should include as much information as possible, and on the other hand, we should restrict our model to be overfitting.
+
 
 #Missing Plot
 ```{r}
@@ -47,6 +92,18 @@ poverty_missing=poverty %>%  select(everything()) %>% summarise_all(funs(sum(is.
 ggplot(poverty_missing, aes(x = reorder(variables, -percent), y = missing_amount,fill=levels)) + geom_bar(stat = "identity") + coord_flip()+ scale_fill_manual(values=c("#1a9641", "#a6d96a", "#d7191c"))+ xlab("Features") + ylab("Number of missing rows") +   ggtitle("Missing variable plot")+ 
   geom_text(aes(label = paste0(round(100 * percent, 2), "%"))) + scale_y_continuous(labels = comma)+theme(plot.title = element_text(hjust = 0.5))
 ```
+
+From the missing plot, we can see there appear NAs in 5 variables and 3 of them have a large proportion of NAs, therefore on the later stage, we tend to drop these three variables and replace NAs for the remaining two.
+
+By the way, we find the data has already been dummified, like below:
+lugar1, =1 region Central
+lugar2, =1 region Chorotega
+lugar3, =1 region PacÃƒÂfico central
+lugar4, =1 region Brunca
+lugar5, =1 region Huetar AtlÃƒÂ¡ntica
+lugar6, =1 region Huetar Norte
+
+Therefore in order to reduce the time for training some certain models (for example, random forest), we may reconstruct these features to make reduce the dimension of features.
 
 ```{r}
 a<-ggplot(poverty,aes(x=rooms))+geom_bar()+ylab("Count")+xlab("Number of All Rooms in the House")+scale_y_continuous(labels = comma)
@@ -195,6 +252,9 @@ corrma=round(cor(poverty %>% select(-v2a1,-v18q1,-rez_esc,-dependency,-edjefa) %
 corrplot(corrma,order = "hclust", tl.cex = 0.5)
 ```
 
+##Correlation
+Following is the correlation plot of all the 142 variables. For each pair of the variables, we can see the correlation. If the color is darker, it indicates that the the degree of correlation is deeper. Blue means the positive correlation and red means the negative correlation. Notice that some of the variables such as age and SQBage is highly related because SQBage is age squared. Thus, when building the model, we should deal with it. For example, we can choose one from SQBage and age since they carry similar information.
+
 ##PCA
 ```{r warning=FALSE,message=FALSE}
 
@@ -318,7 +378,11 @@ poverty_pca_train_validation = poverty_pca_train[-inTraining,]
 ```
 
 
-#randomForest
+#Random Forest
+##Limitation
+
+We splilt the training data into a training set (70%) and (30%), and replace the NAs with 0s. Then We first train the random forest model with tuneLength 5, and choose the mtry with highest accurary, that is, 75 for the following trainings. However, due to the limited computation resources, this time we are not able to conduct a more precise search of parameters and a cross validation to reduce overfitting.
+
 ```{r}
 impute.zero <- function(x) replace(x, is.na(x), 0)
 poverty_rf=poverty %>% select(-v2a1,-v18q1,-rez_esc,-Id,-idhogar,-dependency,-edjefa) %>% mutate(SQBmeaned=impute.zero(SQBmeaned),
@@ -359,7 +423,9 @@ colnames(result)=c("Id","Target")
 write.csv(result,"rf_submission.csv",row.names=FALSE)
 ```
 
+From the confustion matrix we get from the prediction, the overal accuracy is pretty high, but the prediction accuracy is not balanced among the 4 levels. The prediction accuracy decreases when predicting the poorer class, although 89% accuracy is good enough.
 
+For the extremley poor class (Class 1), the model has a sensitivity of 78.8%, which means the model correctly predicts 78.8% of all the times when the household is actually in the extremely poor class (Class 1).
 
 ```{r}
 varImp(rf_fit3)
@@ -372,6 +438,7 @@ plot(impvars, main = "Variable Importance for Random Forest")
 ```
 
 
+From the variable importance plot, we can see the top 2 important variables are all about education (average years of education for adults), then followed by dependency ratio, mobile phone amounts, and the predominant material on the outside.
 
 ```{r}
 p8 <- ggplot(poverty_rf, aes(x = as.factor(Target), y = meaneduc)) +
@@ -464,8 +531,7 @@ grid.arrange(p11,p12,p13,nrow=3)
 ```
 
 ##Confusion matrix:
-From the confusion matrix, what we noticed is that the accuracy of Gbm model is 74.55%, not bad. As for the sensitivity, since our goal is to predict the poor people in the country, and the lower the number is, the poorer the people are, so number “1” means the poorest people. And our sensitivity for “1” is meaning 34.51%,  that for the total results we predict, 34.51% we predict is “1” is actually “1”, not very good, but we should notice that in the training set that Kaggle gave us, only 7.9% of the data has the label “1”, and 62.8% of the data has label “4”, so it is normal that the model performs not that good when figuring out people with label “1”.
-As for PPV, the PPV for “1” is 71.56%, meaning that for the real world data, 71.56% we predict is “1” is actually “1”.
+From the confusion matrix, what we noticed is that the accuracy of Gbm model is 77.7%, not bad. As for the sensitivity, since our goal is to predict the poor people in the country, and the lower the number is, the poorer the people are, so number “1” means the poorest people. And our sensitivity for “1” is 48.61%, meaning that for for all the class 1 in the real world, 48.51% we predict is “1”, not very good. As for PPV, the PPV for “1” is 87.23%, meaning that for what we predict as "1", 87.23% of them is actually “1”.
 ```{r}
 pred_Gbm <- predict(object = final_Gbm, newdata = poverty_gbm_validation, type = "raw")
 confusionMatrix(pred_Gbm, poverty_gbm_validation$Target)
@@ -511,7 +577,6 @@ p13 <- ggplot(poverty_pca_train_training, aes(x = as.factor(Target), y = PC1)) +
   labs( x="degree of poverty")+
   ggtitle("Frequency distribution - principle component 1") +
   theme(plot.title = element_text(hjust = 0.5))
-
 p13
 #grid.arrange(p13,p14,nrow=2)
 ```
