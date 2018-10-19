@@ -372,6 +372,11 @@ write.csv(result,"rf_submission.csv",row.names=FALSE)
 ```
 
 ```{r}
+varImp(rf_fit3)
+```
+
+
+```{r}
 impvars <- varImp(rf_fit3)
 plot(impvars, main = "Variable Importance for Random Forest")
 ```

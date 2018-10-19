@@ -58,5 +58,9 @@ Therefore in order to reduce the time for training some certain models (for exam
 
 
 ##Random Forest
-We splilt the training data into a training set (70%) and (30%), and replace the NAs with 0s. Then We first train the random forest model with tuneLength 5, and choose the 
+We splilt the training data into a training set (70%) and (30%), and replace the NAs with 0s. Then We first train the random forest model with tuneLength 5, and choose the mtry with highest accurary, that is, 75.
+
+From the variable importance plot, we can see the top 2 important variables are all about education (average years of education for adults), then followed by dependency ratio, mobile phone amounts, and the predominant material on the outside.
+
+From the confustion matrix we get from the prediction, the overal accuracy is pretty high, but the prediction accuracy is not balanced among the 4 levels. The prediction accuracy decreases when predicting the poorer class, although 89% accuracy is good enough.
 
