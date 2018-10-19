@@ -36,13 +36,6 @@ ggplot(poverty_missing, aes(x = reorder(variables, -percent), y = missing_amount
 
 
 ```{r}
-corrma=round(cor(poverty %>% na.omit()%>% select_if(is.numeric)),2)
-melted_corrma <- melt(corrma) 
-ggplot(data = melted_corrma, aes(x=Var1, y=Var2, fill=value)) + 
-  geom_tile()+
- scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-   midpoint = 0, limit = c(-1,1), space = "Lab",name="Correlation Meter")
-
 
 ```
 ```{r}
@@ -101,23 +94,34 @@ poverty=as_tibble(cbind(poverty , new_features_integer))
 
 ```{r}
 impute.mean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
-poverty_rf=poverty %>% select(-v2a1,-v18q1,-rez_esc,-Id,-idhogar,-dependency) %>% mutate(SQBmeaned=impute.mean(SQBmeaned),
-                                                                                         meaneduc=impute.mean(meaneduc))
+impute.zero <- function(x) replace(x, is.na(x), 0)
+poverty_rf=poverty %>% select(-v2a1,-v18q1,-rez_esc,-Id,-idhogar,-dependency,-edjefa) %>% mutate(SQBmeaned=impute.zero(SQBmeaned),
+                                                                                         meaneduc=impute.zero(meaneduc))
 poverty_rf$Target=as.factor(poverty_rf$Target)
+
+seed <- 100
+set.seed(seed)
+
+inTraining <- createDataPartition(poverty_rf$Target, p=0.7, list=FALSE)
+poverty_rf_training=poverty_rf[inTraining,]
+poverty_rf_validation=poverty_rf[-inTraining,]
+
 #control <- trainControl(method="repeatedcv", number=10, repeats=3)
 tTrace=trainControl(verboseIter = TRUE)
-seed <- 7
+
 metric <- "Accuracy"
-set.seed(seed)
-mtry <- 106
+
+mtry <- 75
 tunegrid <- expand.grid(.mtry=mtry)
 
-rf_fit2 <- train(Target ~ ., data = poverty_rf, method = "rf", metric = "Accuracy",
-                tunegrid=tunegrid，trControl=tTrace)
+rf_fit3 <- train(Target ~ ., data = poverty_rf_training, method = "rf", metric = "Accuracy", tuneGrid=tunegrid,trControl=tTrace)
 
-print(rf_fit2)
-save(rf_fit2，file="rf_fit2.rda")
-#load("rf_fit2.rda")
+print(rf_fit3)
+save(rf_fit3，file="rf_fit3.rda")
+
+pred_validation <- predict(rf_fit3, newdata=poverty_rf_validation)
+confusionMatrix(data=pred_validation, poverty_rf_validation$Target)
+#load("rf_fit3.rda")
 ```
 
 ```{r}
@@ -146,11 +150,23 @@ for(i in 1:length(feature_list)){
 }
 
 poverty_test=as_tibble(cbind(poverty_test , new_features_integer))
-poverty_test=poverty_test%>% select(-v2a1,-v18q1,-rez_esc,-idhogar,-dependency) %>% mutate(SQBmeaned=impute.mean(SQBmeaned),
+poverty_test=poverty_test%>% select(-v2a1,-v18q1,-rez_esc,-idhogar,-dependency,-edjefa) %>% mutate(SQBmeaned=impute.mean(SQBmeaned),
                                                                                          meaneduc=impute.mean(meaneduc))
 pred <- predict(rf_fit2, newdata=poverty_test)
 result=data.frame(poverty_test$Id,pred)
 colnames(result)=c("Id","Target")
 write.csv(result,"Result.csv",row.names=FALSE)
+```
+
+```{r}
+corrma=round(cor(poverty_rf %>% na.omit()%>% select_if(is.numeric)),2)
+melted_corrma <- melt(corrma) 
+ggplot(data = melted_corrma, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()+
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+   midpoint = 0, limit = c(-1,1), space = "Lab",name="Correlation Meter")
+
+corrplot(corrma,order = "hclust", tl.cex = 0.5)
+melted_corrma %>% filter(abs(value)>0.8 & abs(value)<1) 
 ```
 
