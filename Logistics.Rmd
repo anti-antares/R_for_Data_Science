@@ -86,61 +86,80 @@ for(i in 1:length(feature_list)){
 
 
 
-Distribution 
-room normally distributed 
-size of household left skewed
+Variables Distribution Analysis
+
+
+We want to see how household variables that discribe different perspectives of household are distributed in our model. Some are normally distirbuted, some are left-skewed, and some do not possess certain patterns. And we use different colors to differenciate different levels of poverty.(with 1 being the extremely poor individuals, with 4 being the non vulnerables)
+
+The variable that represent number of all rooms in the house are normally distributed. <br/>
+The variable that represent size of the household and number of mobile phones are left-skewed.<br/>
+The variable that represent years of years of schooling do not possess a certain pattern. 
+
+Within each distribution, we can see that the non vulnerables group takes up most percentanges. This is due to the fact that our datasets naturally contains more non vulnerables. 
+
+
+Later in the Pinciple Component Analysis Section, we will choose 10 prinicipal components that explain the variances most. Thus, we would not bother to transform the data for our multinomial logistics model in our project.
+
+
 ```{r}
-##recode the variables 
-##do the distribution by categories 
-##recode完成之后 再加变量或者根据前面data 介绍部分的分类来确定要做哪些variables的distribution
 
-a<-ggplot(poverty,aes(x=rooms))+geom_bar()+ylab("Count")+xlab("Number of All Rooms in the House")
+a<-ggplot(poverty,aes(x=rooms))+geom_bar(aes(fill=as.factor(Target)))+ylab("Count")+xlab("Number of All Rooms in the House")+labs(fill="Poverty")
 
-b<-ggplot(poverty,aes(x=tamhog))+geom_bar()+ylab("Count")+xlab("Size of the Household")
+b<-ggplot(poverty,aes(x=tamhog))+geom_bar(aes(fill=as.factor(Target)))+ylab("Count")+xlab("Size of the Household")+labs(fill="Poverty")
 
-c<-ggplot(poverty,aes(x=escolari))+geom_bar()+ylab("Count")+xlab("Years of Schooling")
+c<-ggplot(poverty,aes(x=escolari))+geom_bar(aes(fill=as.factor(Target)))+ylab("Count")+xlab("Years of Schooling")+labs(fill="Poverty")
 
-ggplot(new_features_integer,aes(x=pared_int))+geom_bar()+ylab("Count")
-ggplot(new_features_integer,aes(x=piso_int))+geom_bar()+ylab("Count")
+d<-ggplot(poverty,aes(x=qmobilephone))+geom_bar(aes(fill=as.factor(Target)))+ylab("Count")+xlab("Number of Mobile Phones")+labs(fill="Poverty")
 
-grid.arrange(a,b,c, nrow = 3,top="Distribution Analysis")
+grid.arrange(a,b,c,d, nrow = 2,top="Variables Distribution Analysis")
+
 
 ```
 
 PCA
 
-the first 10 variables explain ...% of the variances.
-According to the graph, the most 
+The most important vairable (PC1) and second most important variable(PC2) explain 16.8% of the variances of the dataset in total. 
 
-explain what are PC1 and PC2 
 
-pc1:
+From the graph, We want to interpret these two variables:
+
+
+PC1 is largely related with numnber of people in the households and how crowded the home is. 
+Some contributing variables are: 
 hogar_total, # of total individuals in the household
 r4t3, Total persons in the household
 hhsize, household size
-...
+hogar_nin, Number of children 0 to 19 in household
+overcrowding  # persons per room
 
-pc2: 
-cielorazo, =1 if the house has ceiling
-r4m2, Females 12 years of age and older
+
+PC2 is largely related with education: 
+Some contributing variables are: 
+esolari, years of schooling
+SQBescolari, escolari squared
+
+The first 10 principal components chosen by the PCA explain 36.9% of the dataset variances, which is pretty significant in our model. 
+
 ....
 
 ```{r}
+library(ggplot2)
+library(RColorBrewer)
 
 poverty_numerical = poverty_total %>% select_if(is.numeric)  ## get the numerical columns 
 poverty_numerical$elimbasu5 <- NULL
 
 full_pca = prcomp(poverty_numerical, center = TRUE, scale. = TRUE)
-library(factoextra)
-fviz_eig(full_pca)
-
 
 fviz_pca_var(full_pca,
-             col.var = "contrib", # Color by contributions to the PC
-             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
-             select.var = list(contrib = 20), # top 20 contributing
-             repel = TRUE     # Avoid text overlapping
-             )
+             col.var = "contrib", 
+             gradient.cols = c("#FC4E07","#00AFBB","#E7B800"),
+             select.var = list(contrib = 30), # top 30 contributing
+             repel = TRUE,
+             title="PCA-Plot")
+
+library(factoextra)
+fviz_eig(full_pca, addlabels=TRUE)
 
 # view <- full_pca$rotation
 # to view how to interpret the coefficients 
@@ -165,7 +184,6 @@ poverty_test$Target <-NULL
 
 
 
-
 split data 
 ```{r}
 seed <-100
@@ -178,7 +196,35 @@ poverty_train_validation = poverty_train[-inTraining,]
 
 
 
-Multi_nomial
+Multinomial
+
+In the dataset we are working on, the dependent variables have 4 different levels, instead of 2. So we use the multinomial logistics regression model.  
+
+[Confusion Matrix Interpretation]
+
+In the validation dataset, the model has a overall accuracy of 0.6482. Out of the predictions of Extreme Poverty,Moderate Porverty, Vulnerable Households and Non Vulnerable Households, we got 64.82% of the predictions correctly. 
+
+For the prediction of Extreme poverty(Class 1), the model has a sensitivity of 2.2%, a Pos Pred Value of 41.67%. This suggsts that
+
+1) Out of individuals who are actually extremely poor, we successfully predict about 2.2% of the times. The model does not perform very well in terms of this metric: Out of 7.9% people who are actually extremely poor, we only predicted 2.2% of them correctly.
+
+2) Out of all the individuals that we predict to be extremely poor, 41.6% are actually extreme poor. 
+
+
+For the prediction of non vulnerable households, The model has a sensitivity of 95.66%. This suggests that out of people who are non vulnerable, we correctly predict 95.66% of the time. In the validation set, 62.8% of the people are non vulnerable. So our predictions is pretty good. This would efficiently help the bank to avoid providing money to people who are non vulnerable and who do not necessarily need the money. 
+
+
+[Coefficient analysis]
+
+With PC1, it has a negative relationship with the poverty level. The coefficient PC1 of multinomial logistics is negative, suggesting that with PC1, individuals are more likely to be turning to the poorer level. Remember that in the EDA section, we discovered that PC1 is related with overcrowding of the household. That suggests that if household is more crowded, than the household is more likely on average to be poorer.
+
+The coefficient PC2 of multinomial logistics regression is positive, suggesting that with PC2, individuals are more likely to be turning to the non vulnerable level. And again in the EDA section, we discovered that PC2 is related with years of schooling. That suggests that with more years of schooling, the household is more likely on average to be richer. 
+
+All of the 2 coefficient analysis makes sense intuitively: When households are poorer, their homes are more likely to be crowded and they have more people in a home. When households are richer, they have longer years of schooling because they are able to afford the huge amount of tuitions and living costs. 
+
+Again when we look back to the EDA: we are able to find similar patterns. 
+
+
 ```{r}
 
 library(nnet)
@@ -196,13 +242,48 @@ confusionMatrix(poverty_log_prediction_validation, poverty_train_validation$Targ
 
 poverty_log_prediction_test <- predict(object = poverty_multinolog, newdata =poverty_test)
 
-
 result <-data.frame(poverty_test$Id,poverty_log_prediction_test)
 colnames(result) <-c("Id","Target")
 write.csv(result,"submission_shuting.csv",row.names = FALSE)
 
-
 ```
+
+
+[Business recommendations]
+Based on our EDA, models and findings anlayses, we have the following recommendations in response to the business questions for the project. <br/>
+
+**1) Recommend variables that are related to schooling, household crowding, house quality, and number of cellphones owned as the most important variables from both the models and EDA analysis. **<br/>
+
+From the models we found that: <br>
+More schooling generally indicates that households are less non vunlenerable. <br/>
+schooling related variables include:<br/>
+Meaneduc，the degree of education 
+
+household crowding related variables: household being crowded generally indicates that households are more impoverished. <br/>
+r4t3, Total persons in the household;<br/>
+overcrowding  # persons per room 
+
+house quality related variables: worse house quality generally indicates that households are more impoverished <br/>
+Cielorazo, the area of the ceilin
+
+number of cellpones owned: more number of cellphones owned generally indicates that households are less non impoverished.<br/>
+Qmobilephone
+
+These interpretations from the models are very similar to the ones we got from the boxplots we previously drawn. <br/>
+
+These interpretations may seem to be very intuitive to what we usually think. But this helps us to identify the most important variables to look at when predicting poverty levels. Thus, they do provide some level of practical senses. 
+
+
+
+**2) Recommend the random forest model for the Inter-American Development Bank to identify impoverished individuals for the bank to provide the aiding programs. **
+
+
+[Vision of our project]  <br/>
+Our recommendations will help the Inter-American Development Bank identify the impoverished households and improve social inequality by providing sufficient aids to people who are in need of. At the same time, we are making sure that the bank is not wasting their precious aids to non-vulnerable people who do not need the money. Compared to the previous PMT model that the bank is using, our random forest model Although the project is primarily targeted at households in Costa Rica, the models can definitely be applied to other countries and regions in the future, and help the institution to expand its impact in improving inequality issues. 
+
+
+
+
 
 
 
