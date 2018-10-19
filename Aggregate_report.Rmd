@@ -79,8 +79,6 @@ grid.arrange(p1,p2,nrow=2)
 ```
 
 ```{r}
-
-
 p3 <- ggplot(poverty, aes(x = as.factor(Target), y = SQBdependency)) +
   geom_boxplot(aes(fill=as.factor(Target))) +
   labs(fill="degree_of_poverty")+
@@ -106,6 +104,9 @@ p5 <- ggplot(poverty, aes(x = as.factor(Target), y = overcrowding)) +
   theme(plot.title = element_text(hjust = 0.5))
 grid.arrange(p3,p4,p5,nrow=3)
 ```
+
+
+
 
 ```{r}
 p6 <- ggplot(poverty, aes(x = tamhog, y = tamviv,color=as.factor(Target))) +
@@ -205,10 +206,10 @@ corrplot(corrma,order = "hclust", tl.cex = 0.5)
 ```
 
 PCA
-```{r}
+```{r warning=FALSE,message=FALSE}
 
 poverty_pca <- read_csv(file = "Train.csv")
-poverty_pca_test <-read_csv(file ="Test.csv")
+poverty_pca_test <-read_csv(file ="test.csv")
 
 
 poverty_pca$tag <-"Train"
@@ -250,21 +251,13 @@ feature_list = c(
   "area"
 )
 
-# Matrix to store our new features
-
 new_features_integer = data.frame(matrix(ncol = length(feature_list), nrow = nrow(full)))
-
-# Cycle through and reverse the OHE process for these
 
 ohe_names = vector()
 
 for(i in 1:length(feature_list)){
   
-  # Grab the feature
-  
   feature_to_fix = full %>% select(starts_with(feature_list[i]))
-  
-  # Fix and enter into our new feature matrix
   
   new_features_integer[,i] = as.integer(factor(names(feature_to_fix)[max.col(feature_to_fix)], ordered = FALSE))
   names(new_features_integer)[i] = paste0(feature_list[i],"_int")
@@ -277,8 +270,13 @@ poverty_pca_numerical = poverty_pca_total %>% select_if(is.numeric)  ## get the 
 poverty_pca_numerical$elimbasu5 <- NULL
 
 full_pca = prcomp(poverty_pca_numerical, center = TRUE, scale. = TRUE)
+```
 
+```{r}
 fviz_eig(full_pca)
+```
+
+```{r}
 
 
 fviz_pca_var(full_pca,
@@ -371,6 +369,8 @@ colnames(result)=c("Id","Target")
 write.csv(result,"rf_submission.csv",row.names=FALSE)
 ```
 
+
+
 ```{r}
 varImp(rf_fit3)
 ```
@@ -379,6 +379,35 @@ varImp(rf_fit3)
 ```{r}
 impvars <- varImp(rf_fit3)
 plot(impvars, main = "Variable Importance for Random Forest")
+```
+
+
+
+```{r}
+p8 <- ggplot(poverty_rf, aes(x = as.factor(Target), y = meaneduc)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - years of education") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+p9 <- ggplot(poverty_rf, aes(x = as.factor(Target), y = SQBdependency)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - dependency ratio squared") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+p10 <- ggplot(poverty_rf, aes(x = as.factor(Target), y = qmobilephone)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - number of mobile phones") +
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(p8,p9,p10,nrow=3)
 ```
 
 
@@ -399,12 +428,12 @@ load("2final_Gbm_.rda")
 varImp(final_Gbm)
 ```
 
-``` {r}
+```{r}
 impvars <- varImp(final_Gbm)
 plot(impvars, main = "Variable Importance for GBM")
 ```
 
-``` {r}
+```{r}
 pred_Gbm <- predict(object = final_Gbm, newdata = poverty_gbm_validation, type = "raw")
 confusionMatrix(pred_Gbm, poverty_gbm_validation$Target)
 
@@ -416,6 +445,33 @@ result=data.frame(poverty_test_id,predTest_Gbm)
 colnames(result)=c("Id","Target")
 write.csv(result,"gbm_submission.csv",row.names=FALSE)
 
+```
+
+```{r}
+p11 <- ggplot(poverty_gbm_training, aes(x = as.factor(Target), y = overcrowding)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - number of persons per room") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+p12 <- ggplot(poverty_gbm_training, aes(x = as.factor(Target), y = SQBdependency)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - dependency ratio squared") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+p13 <- ggplot(poverty_gbm_training, aes(x = as.factor(Target), y = cielorazo)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - the area of the ceiling") +
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(p11,p12,p13,nrow=3)
 ```
 
 
@@ -438,6 +494,20 @@ result <-data.frame(poverty_pca_test$Id,poverty_pca_log_prediction_test)
 colnames(result) <-c("Id","Target")
 write.csv(result,"submission_shuting.csv",row.names = FALSE)
 
+```
+
+
+```{r}
+p13 <- ggplot(poverty_pca_train_training, aes(x = as.factor(Target), y = PC1)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - principle component 1") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+p13
+#grid.arrange(p13,p14,nrow=2)
 ```
 
 
