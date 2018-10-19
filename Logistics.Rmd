@@ -25,6 +25,63 @@ poverty_total$SQBmeaned <-NULL
 
 poverty_total$dependency <- NULL
 poverty_total$idhogar <-NULL
+
+
+
+
+
+
+full = as_tibble(rbind(poverty %>% select,poverty_test))
+
+# Create a list of the features names that need to be reverse engineered
+
+feature_list = c(
+  "pared",
+  "piso",
+  "techo",
+  "abasta",
+  "sanitario",
+  "energcocinar",
+  "elimbasu",
+  "epared",
+  "etecho",
+  "eviv",
+  "estadocivil",
+  "parentesco",
+  "instlevel",
+  "tipovivi",
+  "lugar",
+  "area"
+)
+
+# Matrix to store our new features
+
+new_features_integer = data.frame(matrix(ncol = length(feature_list), nrow = nrow(full)))
+
+# Cycle through and reverse the OHE process for these
+
+ohe_names = vector()
+
+for(i in 1:length(feature_list)){
+  
+  # Grab the feature
+  
+  feature_to_fix = full %>% select(starts_with(feature_list[i]))
+  
+  # Fix and enter into our new feature matrix
+  
+  new_features_integer[,i] = as.integer(factor(names(feature_to_fix)[max.col(feature_to_fix)], ordered = FALSE))
+  names(new_features_integer)[i] = paste0(feature_list[i],"_int")
+  
+  ohe_names = c(ohe_names, as.vector(names(feature_to_fix)))
+  
+}
+
+# for(i in 1:length(feature_list)){
+#   poverty =poverty %>% select(-starts_with(feature_list[i]))
+# }
+# poverty_total=as_tibble(cbind(poverty , new_features_integer))
+
 ```
 
 
@@ -42,6 +99,9 @@ a<-ggplot(poverty,aes(x=rooms))+geom_bar()+ylab("Count")+xlab("Number of All Roo
 b<-ggplot(poverty,aes(x=tamhog))+geom_bar()+ylab("Count")+xlab("Size of the Household")
 
 c<-ggplot(poverty,aes(x=escolari))+geom_bar()+ylab("Count")+xlab("Years of Schooling")
+
+ggplot(new_features_integer,aes(x=pared_int))+geom_bar()+ylab("Count")
+ggplot(new_features_integer,aes(x=piso_int))+geom_bar()+ylab("Count")
 
 grid.arrange(a,b,c, nrow = 3,top="Distribution Analysis")
 
@@ -70,9 +130,10 @@ r4m2, Females 12 years of age and older
 poverty_numerical = poverty_total %>% select_if(is.numeric)  ## get the numerical columns 
 poverty_numerical$elimbasu5 <- NULL
 
+full_pca = prcomp(poverty_numerical, center = TRUE, scale. = TRUE)
 library(factoextra)
 fviz_eig(full_pca)
-full_pca = prcomp(poverty_numerical, center = TRUE, scale. = TRUE)
+
 
 fviz_pca_var(full_pca,
              col.var = "contrib", # Color by contributions to the PC
@@ -99,28 +160,42 @@ poverty_train <- subset(poverty_total, tag=="Train")
 poverty_test <- subset(poverty_total, tag=="Test")
 poverty_test$Target <-NULL
 
+```
 
 
+
+
+
+split data 
+```{r}
+seed <-100
+set.seed(seed)
+inTraining <-createDataPartition(poverty_train$Target,p=0.7,list=FALSE)
+poverty_train_training = poverty_train[inTraining,]
+poverty_train_validation = poverty_train[-inTraining,]
 
 ```
 
 
-Multi_nomial
 
+Multi_nomial
 ```{r}
 
 library(nnet)
 library(caret)
 
-poverty_multinolog <- multinom(Target ~PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10, data=poverty_train)
+poverty_multinolog <- multinom(Target ~PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10, data=poverty_train_training)
 summary(poverty_multinolog)
 
-poverty_log_prediction_train <- predict(object = poverty_multinolog, newdata = poverty_train) 
+poverty_log_prediction_train <- predict(object = poverty_multinolog, newdata = poverty_train_training) 
 ## table(actual = poverty_train$Target, predict = poverty_log_prediction_train)
 ## confusionMatrix(poverty_log_prediction_train, poverty_train$Target)
 
-poverty_log_prediction_test <- predict(object = poverty_multinolog, newdata = poverty_test)
-##confusionMatrix(poverty_log_prediction_test, poverty_test$Target)
+poverty_log_prediction_validation <- predict(object = poverty_multinolog, newdata =poverty_train_validation)
+confusionMatrix(poverty_log_prediction_validation, poverty_train_validation$Target)
+
+poverty_log_prediction_test <- predict(object = poverty_multinolog, newdata =poverty_test)
+
 
 result <-data.frame(poverty_test$Id,poverty_log_prediction_test)
 colnames(result) <-c("Id","Target")
