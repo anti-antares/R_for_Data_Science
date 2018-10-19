@@ -1,0 +1,124 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+EDA:First, let's see among the 142 variables, which variables have the high relations with the degree of poverty(described as the variable called "Target"， the bigger the number, the more of the degree of poverty). For the first step, we can draw the boxplots of all the 142 variables to see their relations with Target. After that, we can pick some variables to draw more precise boxplots and scatterplots and we notice that years of schooling(described as the variable called escolari), and degree of crowding in the house(described as the variable called overcrowding) can have some trends with degree of poverty (some features of these variables change as the degree of poverty goes up). Thus, they should be highly focused when doing the model.
+```{r, warning=FALSE}
+library(DataExplorer)
+library(tidyverse)
+library(randomForest)
+library(gbm)
+library(caret)
+library(e1071)
+library(dbplyr)
+
+poverty<- read_csv(file = "Train.csv")
+poverty_test<-read_csv(file="test.csv")
+
+#plot_boxplot(poverty, by = "Target")
+
+
+p1 <- ggplot(poverty, aes(x = as.factor(Target), y = rooms)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - number of rooms in house") +
+  theme(plot.title = element_text(hjust = 0.5, size = 10))
+
+p2 <- ggplot(poverty, aes(x = as.factor(Target), y = hogar_total)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - number of total individual in household") +
+  theme(plot.title = element_text(hjust = 0.5, size = 10))
+
+grid.arrange(p1,p2,nrow=2)
+
+
+p3 <- ggplot(poverty, aes(x = as.factor(Target), y = SQBdependency)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - dependency squared") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+p4 <- ggplot(poverty, aes(x = as.factor(Target), y = escolari)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - year of schooling") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+p5 <- ggplot(poverty, aes(x = as.factor(Target), y = overcrowding)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - degree of overcrowding") +
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(p3,p4,p5,nrow=3)
+
+p6 <- ggplot(poverty, aes(x = tamhog, y = tamviv,color=as.factor(Target))) +
+  geom_point(alpha = 0.3) +
+  labs(color="degree_of_poverty")+
+  coord_flip()+
+  ggtitle("Scatterplot -  correlation_tamhog_tamviv") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+p7 <- ggplot(poverty, aes(x = SQBescolari, y = tamviv,color=as.factor(Target))) +
+  geom_point(alpha = 0.3) +
+  labs(color="degree_of_poverty")+
+  coord_flip()+
+  ggtitle("Scatterplot -  correlation_SQBescolari_tamviv") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+grid.arrange(p6,p7,nrow=2)
+```
+
+
+```{r}
+poverty <- poverty %>%
+  mutate(Target = as.factor(Target)) %>% 
+  select(-dependency,-Id,-idhogar,-v2a1,-v18q1,-rez_esc,-SQBmeaned,-meaneduc)  
+
+poverty_test <- poverty_test %>%
+  select(-dependency,-idhogar,-v2a1,-v18q1,-rez_esc,-SQBmeaned,-meaneduc) 
+
+
+```
+```{r}
+set.seed(22)
+poverty_gbm <- expand.grid(interaction.depth = 5,
+                        n.trees = 100,
+                        shrinkage = 0.1,
+                        n.minobsinnode = 10)
+#tc=trainControl(verboseIter=TRUE)
+final_Gbm <- train(Target ~., data = poverty, method = "gbm",
+                   tuneGrid = poverty_gbm,
+                   verbose = TRUE)
+
+save(final_Gbm,file="final_Gbm.rda")
+pred_Gbm <- predict(object = final_Gbm, newdata = poverty_test)
+
+print(final_Gbm)
+summary(final_Gbm)
+varImp(final_Gbm)
+impvars <- varImp(final_Gbm)
+plot(impvars, main = "Variable Importance for GBM")
+
+poverty_test_id<-poverty_test %>% 
+  select(Id)
+
+result=data.frame(poverty_test_id,pred_Gbm)
+colnames(result)=c("Id","Target")
+write.csv(result,"submission.csv",row.names=FALSE)
+
+```
+
+
