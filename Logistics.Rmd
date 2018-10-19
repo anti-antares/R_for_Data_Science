@@ -1,0 +1,116 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Distribution 
+```{r}
+##recode the variables 
+##do the distribution by categories 
+
+a<-ggplot(poverty,aes(x=rooms))+geom_bar()+ylab("Count")
+
+b<-ggplot(poverty,aes(x=tamhog))+geom_bar()+ylab("Count")+xlab("Size of the household")
+
+c<-ggplot(poverty,aes(x=escolari))+geom_bar()+ylab("Count")+xlab("Years of Schooling")
+
+grid.arrange(a,b,c, nrow = 3,top="Distribution Analysis")
+
+```
+
+PCA
+```{r}
+
+
+
+```
+
+
+
+
+
+```{r}
+
+
+library(tidyverse)
+library(DataExplorer)
+
+poverty <- read_csv(file = "Train.csv")
+poverty_test <-read_csv(file ="Test.csv")
+poverty$tag <-"Train"
+poverty_test$tag <-"Test"
+
+##poverty <-na.omit(poverty) 
+##too little value 
+poverty_test $Target <-1
+poverty_total <- rbind(poverty,poverty_test)
+poverty_total <- poverty_total %>% mutate(Target=as.factor(Target))
+poverty_total$v2a1 <-NULL  #NA
+poverty_total$v18q1 <-NULL  #NA
+poverty_total$rez_esc <-NULL #NA   #33413
+#names(which(sapply(poverty_total, anyNA)))
+poverty_total$meaneduc <-NULL
+poverty_total$SQBmeaned <-NULL
+
+poverty_total$dependency <- NULL
+poverty_total$idhogar <-NULL
+
+
+##PCA
+poverty_numerical = poverty_total %>% select_if(is.numeric) 
+poverty_numerical$elimbasu5 <- NULL
+full_pca = prcomp(poverty_numerical, center = TRUE, scale. = TRUE)
+View(full_pca)
+
+
+poverty_total= poverty_total %>% 
+  cbind(full_pca$x[,1:10])
+
+library(factoextra)
+fviz_eig(full_pca)
+
+fviz_pca_var(full_pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             select.var = list(contrib = 10), # top 10 contributing
+             repel = TRUE     # Avoid text overlapping
+             )
+
+
+
+poverty_train <- subset(poverty_total, tag=="Train")
+poverty_test <- subset(poverty_total, tag=="Test")
+poverty_test$Target <-NULL
+
+
+
+
+```
+
+
+```{r}
+
+library(nnet)
+library(caret)
+poverty_multinolog <- multinom(Target ~PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10, data=poverty_train)
+summary(poverty_multinolog)
+
+
+poverty_log_prediction_train <- predict(object = poverty_multinolog, newdata = poverty_train) 
+
+table(actual = poverty_train$Target, predict = poverty_log_prediction_train)
+confusionMatrix(poverty_log_prediction_train, poverty_train$Target)
+
+poverty_log_prediction_test <- predict(object = poverty_multinolog, newdata = poverty_test)
+##confusionMatrix(poverty_log_prediction_test, poverty_test$Target)
+
+
+result <-data.frame(poverty_test$Id,poverty_log_prediction_test)
+colnames(result) <-c("Id","Target")
+write.csv(result,"submission_shuting.csv",row.names = FALSE)
+
+
+```
+
+
+
