@@ -1,0 +1,184 @@
+
+
+#Data Explore and Clean
+
+```{r warning=FALSE,message=FALSE}
+library(tidyverse)
+library(caret)
+library(ggplot2)
+library(randomForest)
+library(scales)
+library(reshape2)
+library(e1071)
+library(DataExplorer)
+library(corrplot)
+library(gridExtra)
+
+poverty=read_csv("Train.csv")
+poverty_test=read_csv("test.csv")
+```
+
+```{r}
+introduce(poverty)
+```
+
+```{r}
+introduce(poverty_test)
+```
+
+```{r}
+table(poverty$Target)
+```
+```{r}
+ggplot(poverty)+geom_bar(aes(Target))+ggtitle("Distribution of Label Feature")+theme(plot.title = element_text(hjust = 0.5))+scale_y_continuous(labels = comma)
+```
+
+Missing Plot
+```{r}
+poverty_missing=poverty %>%  select(everything()) %>% summarise_all(funs(sum(is.na(.)))) %>% gather(variables,missing_amount) %>% mutate(percent=missing_amount/nrow(poverty)) %>% 
+  arrange(percent) %>% mutate(levels=case_when(percent>=0.8~"Remove",
+                                              percent>=0.4 & percent<0.8~"Bad",
+                                              percent>=0.05 & percent<0.4~"OK",
+                                              percent<0.05~"Good")) %>% filter(missing_amount>0)
+
+ggplot(poverty_missing, aes(x = reorder(variables, -percent), y = missing_amount,fill=levels)) + geom_bar(stat = "identity") + coord_flip()+ scale_fill_manual(values=c("#1a9641", "#a6d96a", "#d7191c"))+ xlab("Features") + ylab("Number of missing rows") +   ggtitle("Missing variable plot")+ 
+  geom_text(aes(label = paste0(round(100 * percent, 2), "%"))) + scale_y_continuous(labels = comma)+theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+a<-ggplot(poverty,aes(x=rooms))+geom_bar()+ylab("Count")+xlab("Number of All Rooms in the House")+scale_y_continuous(labels = comma)
+
+b<-ggplot(poverty,aes(x=tamhog))+geom_bar()+ylab("Count")+xlab("Size of the Household")+scale_y_continuous(labels = comma)
+
+c<-ggplot(poverty,aes(x=escolari))+geom_bar()+ylab("Count")+xlab("Years of Schooling")+scale_y_continuous(labels = comma)
+
+grid.arrange(a,b,c, nrow = 3,top="Distribution Analysis")
+```
+
+```{r}
+p1 <- ggplot(poverty, aes(x = as.factor(Target), y = rooms)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - number of rooms in house") +
+  theme(plot.title = element_text(hjust = 0.5, size = 10))
+
+p2 <- ggplot(poverty, aes(x = as.factor(Target), y = hogar_total)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - number of total individual in household") +
+  theme(plot.title = element_text(hjust = 0.5, size = 10))
+
+grid.arrange(p1,p2,nrow=2)
+```
+
+```{r}
+
+
+p3 <- ggplot(poverty, aes(x = as.factor(Target), y = SQBdependency)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - dependency squared") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+p4 <- ggplot(poverty, aes(x = as.factor(Target), y = escolari)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - year of schooling") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+p5 <- ggplot(poverty, aes(x = as.factor(Target), y = overcrowding)) +
+  geom_boxplot(aes(fill=as.factor(Target))) +
+  labs(fill="degree_of_poverty")+
+  coord_flip()+
+  labs( x="degree of poverty")+
+  ggtitle("Frequency distribution - degree of overcrowding") +
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(p3,p4,p5,nrow=3)
+```
+
+```{r}
+p6 <- ggplot(poverty, aes(x = tamhog, y = tamviv,color=as.factor(Target))) +
+  geom_point(alpha = 0.3) +
+  labs(color="degree_of_poverty")+
+  coord_flip()+
+  ggtitle("Scatterplot -relationship_tamhog_tamviv") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+p7 <- ggplot(poverty, aes(x = hogar_adul, y = r4t2,color=as.factor(Target))) +
+  geom_point(alpha = 0.3) +
+  labs(color="degree_of_poverty")+
+  coord_flip()+
+  ggtitle("Scatterplot -relationship_r4t2_hogar_adul") +
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(p6,p7,nrow=2)
+```
+Data Clean
+```{r}
+feature_list = c(
+  "pared",
+  "piso",
+  "techo",
+  "abasta",
+  "sanitario",
+  "energcocinar",
+  "elimbasu",
+  "epared",
+  "etecho",
+  "eviv",
+  "estadocivil",
+  "parentesco",
+  "instlevel",
+  "tipovivi",
+  "lugar",
+  "area"
+)
+
+# Matrix to store our new features
+
+new_features_integer = data.frame(matrix(ncol = length(feature_list), nrow = nrow(poverty)))
+
+# Cycle through and reverse the OHE process for these
+
+ohe_names = vector()
+
+for(i in 1:length(feature_list)){
+  
+  # Grab the feature
+  
+  feature_to_fix = poverty %>% select(starts_with(feature_list[i]))
+  
+  # Fix and enter into our new feature matrix
+  
+  new_features_integer[,i] = as.integer(factor(names(feature_to_fix)[max.col(feature_to_fix)], ordered = FALSE))
+  names(new_features_integer)[i] = paste0(feature_list[i],"_int")
+  
+  ohe_names = c(ohe_names, as.vector(names(feature_to_fix)))
+  
+}
+for(i in 1:length(feature_list)){
+  poverty =poverty %>% select(-starts_with(feature_list[i]))
+}
+
+poverty=as_tibble(cbind(poverty , new_features_integer))
+```
+
+Correlation
+```{r}
+corrma=round(cor(poverty %>% select(-v2a1,-v18q1,-rez_esc,-dependency,-edjefa) %>% na.omit()%>% select_if(is.numeric)),2)
+#melted_corrma <- melt(corrma) 
+#ggplot(data = melted_corrma, aes(x=Var1, y=Var2, fill=value)) + 
+#  geom_tile()+
+# scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+#   midpoint = 0, limit = c(-1,1), space = "Lab",name="Correlation Meter")
+
+corrplot(corrma,order = "hclust", tl.cex = 0.5)
+```
+
