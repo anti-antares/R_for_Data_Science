@@ -13,6 +13,8 @@ library(e1071)
 library(DataExplorer)
 library(corrplot)
 library(gridExtra)
+library(nnet)
+library(factoextra)
 
 poverty=read_csv("Train.csv")
 poverty_test=read_csv("test.csv")
@@ -122,6 +124,7 @@ grid.arrange(p6,p7,nrow=2)
 ```
 Data Clean
 ```{r}
+
 feature_list = c(
   "pared",
   "piso",
@@ -168,17 +171,249 @@ for(i in 1:length(feature_list)){
 }
 
 poverty=as_tibble(cbind(poverty , new_features_integer))
+
+#The same for test set
+new_features_integer = data.frame(matrix(ncol = length(feature_list), nrow = nrow(poverty_test)))
+
+for(i in 1:length(feature_list)){
+  
+  # Grab the feature
+  
+  feature_to_fix = poverty_test %>% select(starts_with(feature_list[i]))
+  
+  # Fix and enter into our new feature matrix
+  
+  new_features_integer[,i] = as.integer(factor(names(feature_to_fix)[max.col(feature_to_fix)], ordered = FALSE))
+  names(new_features_integer)[i] = paste0(feature_list[i],"_int")
+  
+  ohe_names = c(ohe_names, as.vector(names(feature_to_fix)))
+  
+}
+for(i in 1:length(feature_list)){
+  poverty_test =poverty_test %>% select(-starts_with(feature_list[i]))
+}
+
+poverty_test=as_tibble(cbind(poverty_test , new_features_integer))
 ```
 
 Correlation
 ```{r}
 corrma=round(cor(poverty %>% select(-v2a1,-v18q1,-rez_esc,-dependency,-edjefa) %>% na.omit()%>% select_if(is.numeric)),2)
-#melted_corrma <- melt(corrma) 
-#ggplot(data = melted_corrma, aes(x=Var1, y=Var2, fill=value)) + 
-#  geom_tile()+
-# scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-#   midpoint = 0, limit = c(-1,1), space = "Lab",name="Correlation Meter")
 
 corrplot(corrma,order = "hclust", tl.cex = 0.5)
 ```
+
+PCA
+```{r}
+
+poverty_pca <- read_csv(file = "Train.csv")
+poverty_pca_test <-read_csv(file ="Test.csv")
+
+
+poverty_pca$tag <-"Train"
+poverty_pca_test$tag <-"Test"
+
+poverty_pca_test $Target <-1
+poverty_pca_total <- rbind(poverty_pca,poverty_pca_test)
+poverty_pca_total <- poverty_pca_total %>% mutate(Target=as.factor(Target))
+poverty_pca_total$v2a1 <-NULL  #NA
+poverty_pca_total$v18q1 <-NULL  #NA
+poverty_pca_total$rez_esc <-NULL #NA   #33413
+#names(which(sapply(poverty_pca_total, anyNA)))
+poverty_pca_total$meaneduc <-NULL
+poverty_pca_total$SQBmeaned <-NULL
+
+poverty_pca_total$dependency <- NULL
+poverty_pca_total$idhogar <-NULL
+
+full = as_tibble(rbind(poverty_pca %>% select,poverty_pca_test))
+
+# Create a list of the features names that need to be reverse engineered
+
+feature_list = c(
+  "pared",
+  "piso",
+  "techo",
+  "abasta",
+  "sanitario",
+  "energcocinar",
+  "elimbasu",
+  "epared",
+  "etecho",
+  "eviv",
+  "estadocivil",
+  "parentesco",
+  "instlevel",
+  "tipovivi",
+  "lugar",
+  "area"
+)
+
+# Matrix to store our new features
+
+new_features_integer = data.frame(matrix(ncol = length(feature_list), nrow = nrow(full)))
+
+# Cycle through and reverse the OHE process for these
+
+ohe_names = vector()
+
+for(i in 1:length(feature_list)){
+  
+  # Grab the feature
+  
+  feature_to_fix = full %>% select(starts_with(feature_list[i]))
+  
+  # Fix and enter into our new feature matrix
+  
+  new_features_integer[,i] = as.integer(factor(names(feature_to_fix)[max.col(feature_to_fix)], ordered = FALSE))
+  names(new_features_integer)[i] = paste0(feature_list[i],"_int")
+  
+  ohe_names = c(ohe_names, as.vector(names(feature_to_fix)))
+  
+}
+
+poverty_pca_numerical = poverty_pca_total %>% select_if(is.numeric)  ## get the numerical columns 
+poverty_pca_numerical$elimbasu5 <- NULL
+
+full_pca = prcomp(poverty_pca_numerical, center = TRUE, scale. = TRUE)
+
+fviz_eig(full_pca)
+
+
+fviz_pca_var(full_pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             select.var = list(contrib = 20), # top 20 contributing
+             repel = TRUE     # Avoid text overlapping
+             )
+
+poverty_pca_total= poverty_pca_total %>% 
+  cbind(full_pca$x[,1:10])
+poverty_pca_train <- subset(poverty_pca_total, tag=="Train")
+poverty_pca_test <- subset(poverty_pca_total, tag=="Test")
+poverty_pca_test$Target <-NULL
+
+```
+
+Data Preparation
+```{r}
+#randomForest
+impute.zero <- function(x) replace(x, is.na(x), 0)
+poverty_rf=poverty %>% select(-v2a1,-v18q1,-rez_esc,-Id,-idhogar,-dependency,-edjefa) %>% mutate(SQBmeaned=impute.zero(SQBmeaned),
+                                                                                         meaneduc=impute.zero(meaneduc))
+poverty_rf$Target=as.factor(poverty_rf$Target)
+
+#GBM
+poverty_gbm <- poverty %>%
+  mutate(Target = as.factor(Target)) %>% 
+  select(-dependency,-Id,-idhogar,-v2a1,-v18q1,-rez_esc,-SQBmeaned,-meaneduc)  
+
+poverty_test_gbm <- poverty_test %>%
+  select(-dependency,-idhogar,-v2a1,-v18q1,-rez_esc,-SQBmeaned,-meaneduc) 
+
+#Data Split
+seed <- 100
+set.seed(seed)
+
+inTraining <- createDataPartition(poverty_rf$Target, p=0.7, list=FALSE)
+poverty_rf_training=poverty_rf[inTraining,]
+poverty_rf_validation=poverty_rf[-inTraining,]
+
+inTraining <- createDataPartition(poverty$Target, p=0.7, list=FALSE)
+poverty_gbm_training=poverty[inTraining,]
+poverty_gbm_validation=poverty[-inTraining,]
+```
+
+
+randomForest
+```{r}
+impute.zero <- function(x) replace(x, is.na(x), 0)
+poverty_rf=poverty %>% select(-v2a1,-v18q1,-rez_esc,-Id,-idhogar,-dependency,-edjefa) %>% mutate(SQBmeaned=impute.zero(SQBmeaned),
+                                                                                         meaneduc=impute.zero(meaneduc))
+poverty_rf$Target=as.factor(poverty_rf$Target)
+
+seed <- 100
+set.seed(seed)
+
+inTraining <- createDataPartition(poverty_rf$Target, p=0.7, list=FALSE)
+poverty_rf_training=poverty_rf[inTraining,]
+poverty_rf_validation=poverty_rf[-inTraining,]
+
+#control <- trainControl(method="repeatedcv", number=10, repeats=3)
+tTrace=trainControl(verboseIter = TRUE)
+
+metric <- "Accuracy"
+
+mtry <- 75
+tunegrid <- expand.grid(.mtry=mtry)
+
+#rf_fit3 <- train(Target ~ ., data = poverty_rf_training, method = "rf", metric = "Accuracy", tuneGrid=tunegrid,trControl=tTrace)
+
+#print(rf_fit3)
+#save(rf_fit3，file="rf_fit3.rda")
+
+
+
+load("rf_fit3.rda")
+pred_validation <- predict(rf_fit3, newdata=poverty_rf_validation)
+confusionMatrix(data=pred_validation, poverty_rf_validation$Target)
+
+poverty_rf_test=poverty_test%>% select(-v2a1,-v18q1,-rez_esc,-idhogar,-dependency,-edjefa) %>% mutate(SQBmeaned=impute.zero(SQBmeaned),
+                                                                                         meaneduc=impute.zero(meaneduc))
+pred <- predict(rf_fit2, newdata=poverty_rf_test)
+result=data.frame(poverty_rf_test$Id,pred)
+colnames(result)=c("Id","Target")
+write.csv(result,"rf_submission.csv",row.names=FALSE)
+```
+
+GBM
+```{r}
+#poverty_gbm <- expand.grid(interaction.depth = 5,
+#                        n.trees = 100,
+#                        shrinkage = 0.1,
+#                        n.minobsinnode = 10)
+
+#final_Gbm <- train(Target ~., data = poverty_gbm_training, method = "gbm",
+#                   tuneGrid = poverty_gbm,
+#                   verbose = TRUE)
+
+load("2final_Gbm_.rda")
+
+varImp(final_Gbm)
+impvars <- varImp(final_Gbm)
+plot(impvars, main = "Variable Importance for GBM")
+pred_Gbm <- predict(object = final_Gbm, newdata = poverty_gbm_validation, type = "raw")
+confusionMatrix(pred_Gbm, poverty_gbm_validation$Target)
+
+poverty_test_id<-poverty_test %>% 
+  select(Id)
+
+result=data.frame(poverty_test_id,pred_Gbm)
+colnames(result)=c("Id","Target")
+write.csv(result,"submission.csv",row.names=FALSE)
+
+```
+
+
+logistics
+```{r}
+poverty_pca_multinolog <- multinom(Target ~PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10, data=poverty_pca_train_training)
+summary(poverty_pca_multinolog)
+
+poverty_pca_log_prediction_train <- predict(object = poverty_pca_multinolog, newdata = poverty_pca_train_training) 
+## table(actual = poverty_pca_train$Target, predict = poverty_pca_log_prediction_train)
+## confusionMatrix(poverty_pca_log_prediction_train, poverty_pca_train$Target)
+
+poverty_pca_log_prediction_validation <- predict(object = poverty_pca_multinolog, newdata =poverty_pca_train_validation)
+confusionMatrix(poverty_pca_log_prediction_validation, poverty_pca_train_validation$Target)
+
+poverty_pca_log_prediction_test <- predict(object = poverty_pca_multinolog, newdata =poverty_pca_test)
+
+
+result <-data.frame(poverty_pca_test$Id,poverty_pca_log_prediction_test)
+colnames(result) <-c("Id","Target")
+write.csv(result,"submission_shuting.csv",row.names = FALSE)
+
+```
+
 
