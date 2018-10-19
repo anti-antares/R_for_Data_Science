@@ -1,0 +1,66 @@
+---
+title: "Final project: Costa Rican Household Poverty Level Prediction"
+author: "Zhexin Chen, Shuting You and Xiaodi Tao"
+date: October 19, 2018
+output: html_notebook
+---
+This is the final project for CMU 95_778 R for Data Science. The kaggle competition we choose is [Costa Rican Household Poverty Level Prediction](https://www.kaggle.com/c/costa-rican-household-poverty-prediction) held by the Intra-American Development Bank and Kaggle. The project GitLab repository is available [here](https://gitlab.com/antileo1992/95_778.final_project).
+
+##Explore and Clean Data
+The datasets contain 142 features and 1 label (only for the training set). The datasets give comprehensive description of a household surveyed, and the features contain information about several aspects of important information of a household: including household finance, household items, house condition, family composition, education, and basic demographics. 
+
+Below is a list of some representative features:
+
+Household Finance:
+  v2a1, Monthly rent payment
+  ...
+  
+Household Items:
+  v18q1, number of tablets household owns
+  refrig, =1 if the household has refrigerator
+  ...
+  
+House Condition:
+  rooms,  number of all rooms in the house
+  paredblolad, =1 if predominant material on the outside wall is block or brick
+  ...
+  
+Family Composition:
+  hhsize, household size
+  tamviv, number of persons living in the household
+  hogar_adul, Number of adults in household
+  ...
+  
+Education:
+  instlevel1, =1 no level of education
+  ...
+  
+The label "Target" has 4 levels, coded as: "1", "2", "3" and "4", where “1” stands for extreme poverty and "4" stands for non vulnerable households.
+
+The training set has 9557 observations and the testing set has 23856 observations. In order to obtain a higher accuracy on the testing set, on the one hand, our model should include as much information as possible, and on the other hand, we should restrict our model to be overfitting.
+
+From the missing plot, we can see there appear NAs in 5 variables and 3 of them have a large proportion of NAs, therefore on the later stage, we tend to drop these three variables and replace NAs for the remaining two.
+
+By the way, we find the data has already been dummified, like below:
+lugar1, =1 region Central
+lugar2, =1 region Chorotega
+lugar3, =1 region PacÃƒÂfico central
+lugar4, =1 region Brunca
+lugar5, =1 region Huetar AtlÃƒÂ¡ntica
+lugar6, =1 region Huetar Norte
+
+Therefore in order to reduce the time for training some certain models (for example, random forest), we may reconstruct these features to make reduce the dimension of features.
+
+
+
+
+
+
+
+##Random Forest
+We splilt the training data into a training set (70%) and (30%), and replace the NAs with 0s. Then We first train the random forest model with tuneLength 5, and choose the mtry with highest accurary, that is, 75.
+
+From the variable importance plot, we can see the top 2 important variables are all about education (average years of education for adults), then followed by dependency ratio, mobile phone amounts, and the predominant material on the outside.
+
+From the confustion matrix we get from the prediction, the overal accuracy is pretty high, but the prediction accuracy is not balanced among the 4 levels. The prediction accuracy decreases when predicting the poorer class, although 89% accuracy is good enough.
+
