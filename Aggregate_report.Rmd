@@ -1,5 +1,5 @@
 ---
-title: 'Final project: Costa Rican Household Poverty Level Prediction'
+title: 'Final Project: Costa Rican Household Poverty Level Prediction'
 author: "Zhexin Chen, Shuting You and Xiaodi Tao"
 date: "October 19, 2018"
 output:
@@ -14,7 +14,7 @@ This is the final project for CMU 95_778 R for Data Science. The kaggle competit
 Inter-American Development Bank is working on a social program to aid impoverished individuals in Costa Rica. Impoverished individuals are usually unlikely to have direct financial documents(income or expenses) to prove that they truly need the aid. Current models (PMT), which take observable household attributes into account (eg.how many rooms in a house? how many households? )  still needs improvement in terms of prediction accuracy. Our team is working on solving these challenges and helping Inter-American Development Bank identify the most impoverished individuals to give aid to. 
 
 
-##The business questions we aim to address in our project: <br/>
+##Business Question to Address: <br/>
 What are the most important variables that goes into identifying household poverty level?
 What model to recommend to improve household poverty identification accuracy for the Inter-American Development Bank to offer aiding programs to the people that are most in need?
 
@@ -58,14 +58,22 @@ Below is a list of some representative features:
 Household Finance:
 
   v2a1, Monthly rent payment
+  
   ...
+  <br/>
+  
+  
   
 Household Items:
 
   v18q1, number of tablets household owns
   
   refrig, =1 if the household has refrigerator
+  
   ...
+  <br/>
+  
+  
   
 House Condition:
 
@@ -74,6 +82,9 @@ House Condition:
   paredblolad, =1 if predominant material on the outside wall is block or brick
   
   ...
+  <br/>
+  
+  
   
 Family Composition:
 
@@ -84,12 +95,17 @@ Family Composition:
   hogar_adul, Number of adults in household
   
   ...
+  <br/>
+  
+  
   
 Education:
 
   instlevel1, =1 no level of education
   
   ...
+  
+  
   
   
 ```{r}
@@ -101,9 +117,7 @@ table(poverty$Target)
 ggplot(poverty)+geom_bar(aes(Target), fill = "#FF6666")+ggtitle("Distribution of Label")+theme(plot.title = element_text(hjust = 0.5))+scale_y_continuous(labels = comma)
 ```
 
-
 The label "Target" has 4 levels, coded as: "1", "2", "3" and "4", where “1” stands for extreme poverty and "4" stands for non vulnerable households.
-
 
 The training set has 9557 observations and the testing set has 23856 observations. In order to obtain a higher accuracy on the testing set, on the one hand, our model should include as much information as possible, and on the other hand, we should restrict our model to be overfitting.
 
@@ -164,7 +178,7 @@ grid.arrange(a,b,c,d, nrow = 2,top="Variables Distribution Analysis")
 ```
 
 
-Let's see among the 142 variables, which variables have the high relations with the degree of poverty (described as the variable called "Target"，the bigger the number, the less of the degree of poverty). For the first step, we can pick some variables to draw precise boxplots and scatterplots and we notice that years of schooling (described as the variable called escolari), and degree of crowding in the house (described as the variable called overcrowding) can have some trends with degree of poverty (some features of these variables change as the degree of poverty goes up). Thus, they should be highly focused when doing the model.
+Let's see among the 142 variables, which variables have the high relations with the degree of poverty (described as the variable called "Target"，the bigger the number, the less of the degree of poverty). For the first step, we can pick some variables to draw precise boxplots and we notice that years of schooling (described as the variable called escolari), and degree of crowding in the house (described as the variable called overcrowding) can have some trends with degree of poverty (some features of these variables change as the degree of poverty goes up). Thus, they should be highly focused when doing the model.
 
 
 ```{r}
@@ -433,6 +447,11 @@ poverty_pca_total= poverty_pca_total %>%
 
 #Data Preparation
 
+Read data from files, and prepare it for the modeling part. Split the training set into 2 sets with 0.7 and 0.3.
+
+
+Because Kaggle don't provide us with the test set with actual values in it.
+
 ```{r warning=FALSE, message=FALSE}
 #randomForest
 impute.zero <- function(x) replace(x, is.na(x), 0)
@@ -571,7 +590,6 @@ grid.arrange(p8,p9,p10,nrow=3)
 
 Since we have a limit background knowledge of the mathematical meaning behind the Gbm model, we don’t know much about how to adjust the parameters in the Gbm model. Thus, we didn’t adjust a lot to improve Gbm model, but merely try our best to run it.
 
-
 ##Modelling Process
 
 Since some of the variables have a lot of NA, and from the EDA process we found out that some of them such as v2a1, v18q1, rez_esc, SQBmeaned and meaneduc has too many NAs that we must delete those columns. Also, variables such as edjefa and idhogar also has some NAs and  we know that they are not so important to the degree of poverty based on EDA. Finally, Id has nothing related with the degree of poverty, so we delete all the variables mentioned above when doing Gbm model.
@@ -656,18 +674,9 @@ From the confusion matrix, what we noticed is that the accuracy of Gbm model is 
 
 In the dataset we are working on, the dependent variables have 4 different levels, instead of 2. So we use the multinomial logistics regression model.  
 
-[Confusion Matrix Interpretation]
-
-In the validation dataset, the model has a overall accuracy of 0.6482. Out of the predictions of Extreme Poverty,Moderate Porverty, Vulnerable Households and Non Vulnerable Households, we got 64.82% of the predictions correctly. 
-
-For the prediction of Extreme poverty(Class 1), the model has a sensitivity of 2.2%, a Pos Pred Value of 41.67%. This suggsts that
-
-1) Out of individuals who are actually extremely poor, we successfully predict about 2.2% of the times. The model does not perform very well in terms of this metric.
-
-2) Out of all the individuals that we predict to be extremely poor, 41.6% are actually extreme poor. 
 
 
-[Coefficient analysis]
+##Coefficient analysis
 
 With PC1, it has a negative relationship with the poverty level. The coefficient PC1 of multinomial logistics is negative, suggesting that with PC1, individuals are more likely to be turning to the poorer level. Remember that in the EDA section, we discovered that PC1 is related with overcrowding of the household. That suggests that if household is more crowded, than the household is more likely on average to be poorer.
 
@@ -684,7 +693,18 @@ summary(poverty_pca_multinolog)
 poverty_pca_log_prediction_train <- predict(object = poverty_pca_multinolog, newdata = poverty_pca_train_training) 
 ## table(actual = poverty_pca_train$Target, predict = poverty_pca_log_prediction_train)
 ## confusionMatrix(poverty_pca_log_prediction_train, poverty_pca_train$Target)
+```
+##Confusion Matrix Interpretation
 
+In the validation dataset, the model has a overall accuracy of 0.6482. Out of the predictions of Extreme Poverty,Moderate Porverty, Vulnerable Households and Non Vulnerable Households, we got 64.82% of the predictions correctly. 
+
+For the prediction of Extreme poverty(Class 1), the model has a sensitivity of 2.2%, a Pos Pred Value of 41.67%. This suggsts that
+
+1) Out of individuals who are actually extremely poor, we successfully predict about 2.2% of the times. The model does not perform very well in terms of this metric.
+
+2) Out of all the individuals that we predict to be extremely poor, 41.6% are actually extreme poor. 
+
+```{r}
 poverty_pca_log_prediction_validation <- predict(object = poverty_pca_multinolog, newdata =poverty_pca_train_validation)
 confusionMatrix(poverty_pca_log_prediction_validation, poverty_pca_train_validation$Target)
 
@@ -694,11 +714,10 @@ poverty_pca_log_prediction_test <- predict(object = poverty_pca_multinolog, newd
 result <-data.frame(poverty_pca_test$Id,poverty_pca_log_prediction_test)
 colnames(result) <-c("Id","Target")
 write.csv(result,"submission_shuting.csv",row.names = FALSE)
-
 ```
 
 ##Logistic Kaggle Result
-#![Here is my result](Xiaodi_Tao_kagglescreenshot.png)
+#![Here is my result](Shuting_Submission.png)
 
 ```{r}
 p13 <- ggplot(poverty_pca_train_training, aes(x = as.factor(Target), y = PC1)) +
@@ -709,10 +728,7 @@ p13 <- ggplot(poverty_pca_train_training, aes(x = as.factor(Target), y = PC1)) +
   ggtitle("Frequency distribution - principle component 1") +
   theme(plot.title = element_text(hjust = 0.5))
 p13
-#grid.arrange(p13,p14,nrow=2)
 ```
-
-
 
 #Business Recommendations
 Based on our EDA, models and findings anlayses, we have the following recommendations in response to the business questions for the project. <br/>
@@ -739,7 +755,6 @@ These interpretations from the models are very similar to the ones we got from t
 These interpretations may seem to be very intuitive to what we usually think. But this helps us to identify the most important variables to look at when predicting poverty levels. Thus, they do provide some level of practical senses. 
 
 
-
 **2) Recommend the random forest model for the Inter-American Development Bank to identify impoverished individuals for the bank to provide the aiding programs. **
 
 As for the model overall accuracy, logistics regression has an accuracy of 64.82%, rf has an accuracy of 93.72%, Gbm rf has an accuracy of 77.7%.
@@ -756,4 +771,8 @@ Overall, we recommend the Random Forest Model, because it has a highest accuracy
 
 #Vision of Our Project  <br/>
 
-Our recommendations will help the Inter-American Development Bank identify the impoverished households and improve social inequality by providing sufficient aids to people who are in need of. At the same time, we are making sure that the bank is not wasting their precious aids to non-vulnerable people who do not need the money. Compared to the previous PMT model that the bank is using, our random forest model Although the project is primarily targeted at households in Costa Rica, the models can definitely be applied to other countries and regions in the future, and help the institution to expand its impact in improving inequality issues. 
+Our recommendations will help the Inter-American Development Bank identify the impoverished households and improve social inequality by providing sufficient aids to people who are in need of. At the same time, we are making sure that the bank is not wasting their precious aids to non-vulnerable people who do not need the money. Compared to the previous PMT model that the bank is using, our random forest model Although the project is primarily targeted at households in Costa Rica, the models can definitely be applied to other countries and regions in the future, and help the institution to expand its impact in improving inequality issues.
+
+
+#APPENDIX - How to Choose Models?
+This problem is a typical multi-level classification problem, and a lot of features in its dataset have already been dummified - it’s natural to consider Logistic Regression as the predictive model. In addition, GBM, Random Forest and SVM have robust performances on classification problems, therefore we also consider applying them in our  problem-solving process. At last, we select GBM and Random Forest as additional models. After training models and submitting the results, the Random Forest model stands out for its higher accuracy.
