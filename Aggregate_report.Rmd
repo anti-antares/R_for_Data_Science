@@ -1,21 +1,24 @@
 ---
-title: "Final project: Costa Rican Household Poverty Level Prediction"
+title: 'Final project: Costa Rican Household Poverty Level Prediction'
 author: "Zhexin Chen, Shuting You and Xiaodi Tao"
-date: October 19, 2018
-output: html_notebook
+date: "October 19, 2018"
+output:
+  html_document:
+    df_print: paged
 ---
 
 This is the final project for CMU 95_778 R for Data Science. The kaggle competition we choose is [Costa Rican Household Poverty Level Prediction](https://www.kaggle.com/c/costa-rican-household-poverty-prediction) held by the Intra-American Development Bank and Kaggle. The project GitLab repository is available [here](https://gitlab.com/antileo1992/95_778.final_project).
 
 
-##Business Problem Overview: <br/>
+#Business Problem Overview: <br/>
 Inter-American Development Bank is working on a social program to aid impoverished individuals in Costa Rica. Impoverished individuals are usually unlikely to have direct financial documents(income or expenses) to prove that they truly need the aid. Current models (PMT), which take observable household attributes into account (eg.how many rooms in a house? how many households? )  still needs improvement in terms of prediction accuracy. Our team is working on solving these challenges and helping Inter-American Development Bank identify the most impoverished individuals to give aid to. 
 
 
-#The business questions we aim to address in our project are: <br/>
-What are the most important variables that goes into identifying household poverty level  
-What model to recommend to improve household poverty identification accuracy for the Inter-American Development Bank to offer aiding programs to the people that are most in need. 
+##The business questions we aim to address in our project: <br/>
+What are the most important variables that goes into identifying household poverty level?
+What model to recommend to improve household poverty identification accuracy for the Inter-American Development Bank to offer aiding programs to the people that are most in need?
 
+Let's start!
 
 ```{r warning=FALSE,message=FALSE}
 library(tidyverse)
@@ -37,7 +40,7 @@ poverty_test=read_csv("test.csv")
 ```
 
 
-##Explore and Clean Data
+#Explore and Clean Data
 
 
 ```{r}
@@ -53,28 +56,41 @@ The datasets contain 142 features and 1 label (only for the training set). The d
 Below is a list of some representative features:
 
 Household Finance:
+
   v2a1, Monthly rent payment
   ...
   
 Household Items:
+
   v18q1, number of tablets household owns
+  
   refrig, =1 if the household has refrigerator
   ...
   
 House Condition:
+
   rooms,  number of all rooms in the house
+  
   paredblolad, =1 if predominant material on the outside wall is block or brick
+  
   ...
   
 Family Composition:
+
   hhsize, household size
+  
   tamviv, number of persons living in the household
+  
   hogar_adul, Number of adults in household
+  
   ...
   
 Education:
+
   instlevel1, =1 no level of education
+  
   ...
+  
   
 ```{r}
 table(poverty$Target)
@@ -82,11 +98,12 @@ table(poverty$Target)
 
 
 ```{r}
-ggplot(poverty)+geom_bar(aes(Target))+ggtitle("Distribution of Label")+theme(plot.title = element_text(hjust = 0.5))+scale_y_continuous(labels = comma)
+ggplot(poverty)+geom_bar(aes(Target), fill = "#FF6666")+ggtitle("Distribution of Label")+theme(plot.title = element_text(hjust = 0.5))+scale_y_continuous(labels = comma)
 ```
 
 
 The label "Target" has 4 levels, coded as: "1", "2", "3" and "4", where “1” stands for extreme poverty and "4" stands for non vulnerable households.
+
 
 The training set has 9557 observations and the testing set has 23856 observations. In order to obtain a higher accuracy on the testing set, on the one hand, our model should include as much information as possible, and on the other hand, we should restrict our model to be overfitting.
 
@@ -106,14 +123,21 @@ ggplot(poverty_missing, aes(x = reorder(variables, -percent), y = missing_amount
 From the missing plot, we can see there appear NAs in 5 variables and 3 of them have a large proportion of NAs, therefore on the later stage, we tend to drop these three variables and replace NAs for the remaining two.
 
 By the way, we find the data has already been dummified, like below:
+
 lugar1, =1 region Central
+
 lugar2, =1 region Chorotega
+
 lugar3, =1 region PacÃƒÂfico central
+
 lugar4, =1 region Brunca
+
 lugar5, =1 region Huetar AtlÃƒÂ¡ntica
+
 lugar6, =1 region Huetar Norte
 
 Therefore in order to reduce the time for training some certain models (for example, random forest), we may reconstruct these features to make reduce the dimension of features.
+
 #Features Distribution Analysis 
 
 We want to see how household variables that discribe different perspectives of household are distributed in our model. Some are normally distirbuted, some are left-skewed, and some do not possess certain patterns. And we use different colors to differenciate different levels of poverty.(with 1 being the extremely poor individuals, with 4 being the non vulnerables)
@@ -126,6 +150,7 @@ Within each distribution, we can see that the non vulnerables group takes up mos
 
 
 Later in the Pinciple Component Analysis Section, we will choose 10 prinicipal components that explain the variances most. Thus, we would not bother to transform the data for our multinomial logistics model in our project.
+
 ```{r}
 a<-ggplot(poverty,aes(x=rooms))+geom_bar(aes(fill=as.factor(Target)))+ylab("Count")+xlab("Number of All Rooms in the House")+labs(fill="Poverty")
 
@@ -138,7 +163,10 @@ d<-ggplot(poverty,aes(x=qmobilephone))+geom_bar(aes(fill=as.factor(Target)))+yla
 grid.arrange(a,b,c,d, nrow = 2,top="Variables Distribution Analysis")
 ```
 
+
 Let's see among the 142 variables, which variables have the high relations with the degree of poverty (described as the variable called "Target"，the bigger the number, the less of the degree of poverty). For the first step, we can pick some variables to draw precise boxplots and scatterplots and we notice that years of schooling (described as the variable called escolari), and degree of crowding in the house (described as the variable called overcrowding) can have some trends with degree of poverty (some features of these variables change as the degree of poverty goes up). Thus, they should be highly focused when doing the model.
+
+
 ```{r}
 p1 <- ggplot(poverty, aes(x = as.factor(Target), y = rooms)) +
   geom_boxplot(aes(fill=as.factor(Target))) +
@@ -186,7 +214,10 @@ p5 <- ggplot(poverty, aes(x = as.factor(Target), y = overcrowding)) +
 grid.arrange(p3,p4,p5,nrow=3)
 ```
 
+
 Then we try to use scatterplot to analyze the relationship between variables, we tried a lot and found out that “tamhog (size of the household)” and “tamviv (number of persons living in the household)”, “r4t2 (persons 12 years of age and older)” and “hogar_adul (Number of adults in household)” have a strong positive relationship which can be seen in the following scatterplots. Thus, when doing the model, we should consider relationships between variables such as these ones.
+
+
 ```{r}
 p6 <- ggplot(poverty, aes(x = tamhog, y = tamviv,color=as.factor(Target))) +
   geom_point(alpha = 0.3) +
@@ -203,7 +234,9 @@ p7 <- ggplot(poverty, aes(x = hogar_adul, y = r4t2,color=as.factor(Target))) +
   theme(plot.title = element_text(hjust = 0.5))
 grid.arrange(p6,p7,nrow=2)
 ```
+
 #Data Clean
+
 ```{r}
 
 feature_list = c(
@@ -269,14 +302,16 @@ poverty_test=as_tibble(cbind(poverty_test , new_features_integer))
 ```
 
 ##Correlation
+
+Following is the correlation plot of all the 142 variables. For each pair of the variables, we can see the correlation. If the color is darker, it indicates that the the degree of correlation is deeper. Blue means the positive correlation and red means the negative correlation. Notice that some of the variables such as age and SQBage is highly related because SQBage is age squared. Thus, when building the model, we should deal with it. For example, we can choose one from SQBage and age since they carry similar information.
+
 ```{r}
 corrma=round(cor(poverty %>% select(-v2a1,-v18q1,-rez_esc,-dependency,-edjefa) %>% na.omit()%>% select_if(is.numeric)),2)
 
 corrplot(corrma,order = "hclust", tl.cex = 0.5)
 ```
 
-##Correlation
-Following is the correlation plot of all the 142 variables. For each pair of the variables, we can see the correlation. If the color is darker, it indicates that the the degree of correlation is deeper. Blue means the positive correlation and red means the negative correlation. Notice that some of the variables such as age and SQBage is highly related because SQBage is age squared. Thus, when building the model, we should deal with it. For example, we can choose one from SQBage and age since they carry similar information.
+
 
 ##PCA
 
@@ -288,26 +323,35 @@ The most important vairable (PC1) and second most important variable(PC2) explai
 From the graph, We want to interpret these two variables:
 
 
-PC1 is largely related with numnber of people in the households and how crowded the home is. 
+PC1 is largely related with numnber of people in the households and how crowded the home is.
+
 Some contributing variables are: 
+
 hogar_total, # of total individuals in the household
+
 r4t3, Total persons in the household
+
 hhsize, household size
+
 hogar_nin, Number of children 0 to 19 in household
+
 overcrowding  # persons per room
 
 
 PC2 is largely related with education: 
+
 Some contributing variables are: 
+
 esolari, years of schooling
+
 SQBescolari, escolari squared
 
 The first 10 principal components chosen by the PCA explain 36.9% of the dataset variances, which is pretty significant in our model. 
+
 ```{r warning=FALSE,message=FALSE}
 
 poverty_pca <- read_csv(file = "Train.csv")
 poverty_pca_test <-read_csv(file ="test.csv")
-
 
 poverty_pca$tag <-"Train"
 poverty_pca_test$tag <-"Test"
@@ -385,13 +429,10 @@ fviz_pca_var(full_pca,
 poverty_pca_total= poverty_pca_total %>% 
   cbind(full_pca$x[,1:10])
 
-poverty_pca_train <- subset(poverty_pca_total, tag=="Train")
-poverty_pca_test <- subset(poverty_pca_total, tag=="Test")
-poverty_pca_test$Target <-NULL
-
 ```
 
 #Data Preparation
+
 ```{r warning=FALSE, message=FALSE}
 #randomForest
 impute.zero <- function(x) replace(x, is.na(x), 0)
@@ -406,6 +447,11 @@ poverty_gbm <- read_csv("Train.csv") %>%
 
 poverty_test_gbm <- poverty_test %>%
   select(-dependency,-idhogar,-v2a1,-v18q1,-rez_esc,-SQBmeaned,-meaneduc) 
+
+#Logistic
+poverty_pca_train <- subset(poverty_pca_total, tag=="Train")
+poverty_pca_test <- subset(poverty_pca_total, tag=="Test")
+poverty_pca_test$Target <-NULL
 
 #Data Split
 seed <- 100
@@ -426,6 +472,7 @@ poverty_pca_train_validation = poverty_pca_train[-inTraining,]
 
 
 #Random Forest
+
 ##Limitation
 
 We splilt the training data into a training set (70%) and (30%), and replace the NAs with 0s. Then We first train the random forest model with tuneLength 5, and choose the mtry with highest accurary, that is, 75 for the following trainings. However, due to the limited computation resources, this time we are not able to conduct a more precise search of parameters and a cross validation to reduce overfitting.
@@ -451,11 +498,12 @@ metric <- "Accuracy"
 mtry <- 75
 tunegrid <- expand.grid(.mtry=mtry)
 
+#For time saving reason, we are not going to run the model again
+
 #rf_fit3 <- train(Target ~ ., data = poverty_rf_training, method = "rf", metric = "Accuracy", tuneGrid=tunegrid,trControl=tTrace)
 
 #print(rf_fit3)
 #save(rf_fit3，file="rf_fit3.rda")
-
 
 
 load("rf_fit3.rda")
@@ -470,6 +518,10 @@ colnames(result)=c("Id","Target")
 write.csv(result,"rf_submission.csv",row.names=FALSE)
 ```
 
+##Random Forest Kaggle Scores
+#![Here is my result](ZxC_result.png)
+
+
 From the confustion matrix we get from the prediction, the overal accuracy is pretty high, but the prediction accuracy is not balanced among the 4 levels. The prediction accuracy decreases when predicting the poorer class, although 89% accuracy is good enough.
 
 For the extremley poor class (Class 1), the model has a sensitivity of 78.8%, which means the model correctly predicts 78.8% of all the times when the household is actually in the extremely poor class (Class 1).
@@ -478,12 +530,10 @@ For the extremley poor class (Class 1), the model has a sensitivity of 78.8%, wh
 varImp(rf_fit3)
 ```
 
-
 ```{r}
 impvars <- varImp(rf_fit3)
 plot(impvars, main = "Variable Importance for Random Forest")
 ```
-
 
 From the variable importance plot, we can see the top 2 important variables are all about education (average years of education for adults), then followed by dependency ratio, mobile phone amounts, and the predominant material on the outside. In the below box plots, we can find strong relationships between these features and the label.
 
@@ -516,11 +566,14 @@ grid.arrange(p8,p9,p10,nrow=3)
 
 
 #GBM
-##Limitations:  
+
+##Limitations
+
 Since we have a limit background knowledge of the mathematical meaning behind the Gbm model, we don’t know much about how to adjust the parameters in the Gbm model. Thus, we didn’t adjust a lot to improve Gbm model, but merely try our best to run it.
 
 
-##The process of doing the model:  
+##Modelling Process
+
 Since some of the variables have a lot of NA, and from the EDA process we found out that some of them such as v2a1, v18q1, rez_esc, SQBmeaned and meaneduc has too many NAs that we must delete those columns. Also, variables such as edjefa and idhogar also has some NAs and  we know that they are not so important to the degree of poverty based on EDA. Finally, Id has nothing related with the degree of poverty, so we delete all the variables mentioned above when doing Gbm model.
 
 
@@ -541,12 +594,13 @@ load("2final_Gbm_.rda")
 
 varImp(final_Gbm)
 ```
-##Findings:
-##Variable importance:
+
+##Variable Importance:
+
 From the variable importance plot, we can see that the top three important variables are SQBdependncy, cielorazo, and overcrowding. The above variables mean that dependency, the house quality, the number of children and the degree of overcrowding affect the degree of poverty a lot. Note that when we  did EDA and drew the boxplot, we did find out that overcrowding may be important variable, and the result in Gbm model really shows that we were right.
 
-
 Also, note that from the boxplots below, we can know that SQBdependncy and overcrowding have the negative relationship with Target. In actual world, it makes sense because when people have more dependencies and are overcrowded when living, they tend to be poor. What’s more, when the quality of house is good, they tend not to be poor.
+
 ```{r}
 impvars <- varImp(final_Gbm)
 plot(impvars, main = "Variable Importance for GBM")
@@ -577,8 +631,7 @@ p13 <- ggplot(poverty_gbm_training, aes(x = as.factor(Target), y = cielorazo)) +
 grid.arrange(p11,p12,p13,nrow=3)
 ```
 
-##Confusion matrix:
-From the confusion matrix, what we noticed is that the accuracy of Gbm model is 77.7%, not bad. As for the sensitivity, since our goal is to predict the poor people in the country, and the lower the number is, the poorer the people are, so number “1” means the poorest people. And our sensitivity for “1” is 48.61%, meaning that for for all the class 1 in the real world, 48.51% we predict is “1”, not very good. As for PPV, the PPV for “1” is 87.23%, meaning that for what we predict as "1", 87.23% of them is actually “1”.
+
 ```{r}
 pred_Gbm <- predict(object = final_Gbm, newdata = poverty_gbm_validation, type = "raw")
 confusionMatrix(pred_Gbm, poverty_gbm_validation$Target)
@@ -593,8 +646,11 @@ write.csv(result,"gbm_submission.csv",row.names=FALSE)
 
 ```
  
+##Confusion Matrix:
 
-#Multinomial logistics regression
+From the confusion matrix, what we noticed is that the accuracy of Gbm model is 77.7%, not bad. As for the sensitivity, since our goal is to predict the poor people in the country, and the lower the number is, the poorer the people are, so number “1” means the poorest people. And our sensitivity for “1” is 48.61%, meaning that for for all the class 1 in the real world, 48.51% we predict is “1”, not very good. As for PPV, the PPV for “1” is 87.23%, meaning that for what we predict as "1", 87.23% of them is actually “1”.
+
+#Multinomial Logistic Regression
 
 
 In the dataset we are working on, the dependent variables have 4 different levels, instead of 2. So we use the multinomial logistics regression model.  
@@ -655,7 +711,7 @@ p13
 
 
 
-##[Business recommendations]
+#Business Recommendations
 Based on our EDA, models and findings anlayses, we have the following recommendations in response to the business questions for the project. <br/>
 
 **1) Recommend variables that are related to schooling, household crowding, house quality, and number of cellphones owned as the most important variables from both the models and EDA analysis. **<br/>
@@ -683,20 +739,18 @@ These interpretations may seem to be very intuitive to what we usually think. Bu
 
 **2) Recommend the random forest model for the Inter-American Development Bank to identify impoverished individuals for the bank to provide the aiding programs. **
 
-<<<<<<< HEAD
 As for the model overall accuracy, logistics regression has an accuracy of 64.82%, rf has an accuracy of 93.72%, Gbm rf has an accuracy of 77.7%.
+
 When talking about sensitivity for Class 1, logistics regression has sensitivity of 2.21%, rf has sensitivity of 78.76%, Gbm has sensitivity of 48.62%.
+
 As for PPV for Class 1, logistics regression has PPV of 41.67%, rf has PPV of 97.8%, Gbm has PPV of 87.23%.
+
 When it goes to kappa, logistics regression has kappa of 0.1892, rf has kappa of 0.883, Gbm has kappa of 0.5473.
+
 When it comes to the scores on Kaggle, logistics regression has 0.29, rf has 0.375, Gbm has 0.368.
+
 Overall, we recommend the Random Forest Model, because it has a highest accuracy, highest sensitivity(Class1), highest PPV (Class1), highest Kappa, and highest Kaggle scores.
-=======
 
-##[Vision of our project]  <br/>
+#Vision of Our Project  <br/>
+
 Our recommendations will help the Inter-American Development Bank identify the impoverished households and improve social inequality by providing sufficient aids to people who are in need of. At the same time, we are making sure that the bank is not wasting their precious aids to non-vulnerable people who do not need the money. Compared to the previous PMT model that the bank is using, our random forest model Although the project is primarily targeted at households in Costa Rica, the models can definitely be applied to other countries and regions in the future, and help the institution to expand its impact in improving inequality issues. 
->>>>>>> df06c11cbbe880e0e34105206b51ccecc4fe465d
-
-
-##[Vision of our project]  <br/>
-Our recommendations will help the Inter-American Development Bank identify the impoverished households and improve social inequality by providing sufficient aids to people who are in need of. At the same time, we are making sure that the bank is not wasting their precious aids to non-vulnerable people who do not need the money. Compared to the previous PMT model that the bank is using, our random forest model Although the project is primarily targeted at households in Costa Rica, the models can definitely be applied to other countries and regions in the future, and help the institution to expand its impact in improving inequality issues. 
-
