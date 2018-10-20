@@ -538,6 +538,7 @@ write.csv(result,"rf_submission.csv",row.names=FALSE)
 ```
 
 ##Random Forest Kaggle Scores
+#![Here is my result](ZxC_submission.png)
 #![Here is my result](ZxC_result.png)
 
 
