@@ -576,7 +576,6 @@ Since we have a limit background knowledge of the mathematical meaning behind th
 
 Since some of the variables have a lot of NA, and from the EDA process we found out that some of them such as v2a1, v18q1, rez_esc, SQBmeaned and meaneduc has too many NAs that we must delete those columns. Also, variables such as edjefa and idhogar also has some NAs and  we know that they are not so important to the degree of poverty based on EDA. Finally, Id has nothing related with the degree of poverty, so we delete all the variables mentioned above when doing Gbm model.
 
-
 We saved the model as rda file in order to reuse it next time so we comment the code of the model as follow.
 
 ```{r}
@@ -594,6 +593,9 @@ load("2final_Gbm_.rda")
 
 varImp(final_Gbm)
 ```
+
+##GBM Kaggle Result
+#![Here is my result](Xiaodi_Tao_kagglescreenshot.png)
 
 ##Variable Importance:
 
@@ -652,7 +654,6 @@ From the confusion matrix, what we noticed is that the accuracy of Gbm model is 
 
 #Multinomial Logistic Regression
 
-
 In the dataset we are working on, the dependent variables have 4 different levels, instead of 2. So we use the multinomial logistics regression model.  
 
 [Confusion Matrix Interpretation]
@@ -696,6 +697,8 @@ write.csv(result,"submission_shuting.csv",row.names = FALSE)
 
 ```
 
+##Logistic Kaggle Result
+#![Here is my result](Xiaodi_Tao_kagglescreenshot.png)
 
 ```{r}
 p13 <- ggplot(poverty_pca_train_training, aes(x = as.factor(Target), y = PC1)) +
