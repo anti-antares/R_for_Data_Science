@@ -683,12 +683,18 @@ These interpretations may seem to be very intuitive to what we usually think. Bu
 
 **2) Recommend the random forest model for the Inter-American Development Bank to identify impoverished individuals for the bank to provide the aiding programs. **
 
+<<<<<<< HEAD
 As for the model overall accuracy, logistics regression has an accuracy of 64.82%, rf has an accuracy of 93.72%, Gbm rf has an accuracy of 77.7%.
 When talking about sensitivity for Class 1, logistics regression has sensitivity of 2.21%, rf has sensitivity of 78.76%, Gbm has sensitivity of 48.62%.
 As for PPV for Class 1, logistics regression has PPV of 41.67%, rf has PPV of 97.8%, Gbm has PPV of 87.23%.
 When it goes to kappa, logistics regression has kappa of 0.1892, rf has kappa of 0.883, Gbm has kappa of 0.5473.
 When it comes to the scores on Kaggle, logistics regression has 0.29, rf has 0.375, Gbm has 0.368.
 Overall, we recommend the Random Forest Model, because it has a highest accuracy, highest sensitivity(Class1), highest PPV (Class1), highest Kappa, and highest Kaggle scores.
+=======
+
+##[Vision of our project]  <br/>
+Our recommendations will help the Inter-American Development Bank identify the impoverished households and improve social inequality by providing sufficient aids to people who are in need of. At the same time, we are making sure that the bank is not wasting their precious aids to non-vulnerable people who do not need the money. Compared to the previous PMT model that the bank is using, our random forest model Although the project is primarily targeted at households in Costa Rica, the models can definitely be applied to other countries and regions in the future, and help the institution to expand its impact in improving inequality issues. 
+>>>>>>> df06c11cbbe880e0e34105206b51ccecc4fe465d
 
 
 ##[Vision of our project]  <br/>
