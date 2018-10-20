@@ -7,6 +7,16 @@ output: html_notebook
 
 This is the final project for CMU 95_778 R for Data Science. The kaggle competition we choose is [Costa Rican Household Poverty Level Prediction](https://www.kaggle.com/c/costa-rican-household-poverty-prediction) held by the Intra-American Development Bank and Kaggle. The project GitLab repository is available [here](https://gitlab.com/antileo1992/95_778.final_project).
 
+
+##Business Problem Overview: <br/>
+Inter-American Development Bank is working on a social program to aid impoverished individuals in Costa Rica. Impoverished individuals are usually unlikely to have direct financial documents(income or expenses) to prove that they truly need the aid. Current models (PMT), which take observable household attributes into account (eg.how many rooms in a house? how many households? )  still needs improvement in terms of prediction accuracy. Our team is working on solving these challenges and helping Inter-American Development Bank identify the most impoverished individuals to give aid to. 
+
+
+#The business questions we aim to address in our project are: <br/>
+What are the most important variables that goes into identifying household poverty level  
+What model to recommend to improve household poverty identification accuracy for the Inter-American Development Bank to offer aiding programs to the people that are most in need. 
+
+
 ```{r warning=FALSE,message=FALSE}
 library(tidyverse)
 library(caret)
@@ -104,15 +114,28 @@ lugar5, =1 region Huetar AtlÃƒÂ¡ntica
 lugar6, =1 region Huetar Norte
 
 Therefore in order to reduce the time for training some certain models (for example, random forest), we may reconstruct these features to make reduce the dimension of features.
+#Features Distribution Analysis 
 
+We want to see how household variables that discribe different perspectives of household are distributed in our model. Some are normally distirbuted, some are left-skewed, and some do not possess certain patterns. And we use different colors to differenciate different levels of poverty.(with 1 being the extremely poor individuals, with 4 being the non vulnerables)
+
+The variable that represent number of all rooms in the house are normally distributed. <br/>
+The variable that represent size of the household and number of mobile phones are left-skewed.<br/>
+The variable that represent years of years of schooling do not possess a certain pattern. 
+
+Within each distribution, we can see that the non vulnerables group takes up most percentanges. This is due to the fact that our datasets naturally contains more non vulnerables. 
+
+
+Later in the Pinciple Component Analysis Section, we will choose 10 prinicipal components that explain the variances most. Thus, we would not bother to transform the data for our multinomial logistics model in our project.
 ```{r}
-a<-ggplot(poverty,aes(x=rooms))+geom_bar()+ylab("Count")+xlab("Number of All Rooms in the House")+scale_y_continuous(labels = comma)
+a<-ggplot(poverty,aes(x=rooms))+geom_bar(aes(fill=as.factor(Target)))+ylab("Count")+xlab("Number of All Rooms in the House")+labs(fill="Poverty")
 
-b<-ggplot(poverty,aes(x=tamhog))+geom_bar()+ylab("Count")+xlab("Size of the Household")+scale_y_continuous(labels = comma)
+b<-ggplot(poverty,aes(x=tamhog))+geom_bar(aes(fill=as.factor(Target)))+ylab("Count")+xlab("Size of the Household")+labs(fill="Poverty")
 
-c<-ggplot(poverty,aes(x=escolari))+geom_bar()+ylab("Count")+xlab("Years of Schooling")+scale_y_continuous(labels = comma)
+c<-ggplot(poverty,aes(x=escolari))+geom_bar(aes(fill=as.factor(Target)))+ylab("Count")+xlab("Years of Schooling")+labs(fill="Poverty")
 
-grid.arrange(a,b,c, nrow = 3,top="Distribution Analysis")
+d<-ggplot(poverty,aes(x=qmobilephone))+geom_bar(aes(fill=as.factor(Target)))+ylab("Count")+xlab("Number of Mobile Phones")+labs(fill="Poverty")
+
+grid.arrange(a,b,c,d, nrow = 2,top="Variables Distribution Analysis")
 ```
 
 Let's see among the 142 variables, which variables have the high relations with the degree of poverty (described as the variable called "Target"，the bigger the number, the less of the degree of poverty). For the first step, we can pick some variables to draw precise boxplots and scatterplots and we notice that years of schooling (described as the variable called escolari), and degree of crowding in the house (described as the variable called overcrowding) can have some trends with degree of poverty (some features of these variables change as the degree of poverty goes up). Thus, they should be highly focused when doing the model.
@@ -256,6 +279,30 @@ corrplot(corrma,order = "hclust", tl.cex = 0.5)
 Following is the correlation plot of all the 142 variables. For each pair of the variables, we can see the correlation. If the color is darker, it indicates that the the degree of correlation is deeper. Blue means the positive correlation and red means the negative correlation. Notice that some of the variables such as age and SQBage is highly related because SQBage is age squared. Thus, when building the model, we should deal with it. For example, we can choose one from SQBage and age since they carry similar information.
 
 ##PCA
+
+PCA
+
+The most important vairable (PC1) and second most important variable(PC2) explain 16.8% of the variances of the dataset in total. 
+
+
+From the graph, We want to interpret these two variables:
+
+
+PC1 is largely related with numnber of people in the households and how crowded the home is. 
+Some contributing variables are: 
+hogar_total, # of total individuals in the household
+r4t3, Total persons in the household
+hhsize, household size
+hogar_nin, Number of children 0 to 19 in household
+overcrowding  # persons per room
+
+
+PC2 is largely related with education: 
+Some contributing variables are: 
+esolari, years of schooling
+SQBescolari, escolari squared
+
+The first 10 principal components chosen by the PCA explain 36.9% of the dataset variances, which is pretty significant in our model. 
 ```{r warning=FALSE,message=FALSE}
 
 poverty_pca <- read_csv(file = "Train.csv")
@@ -271,7 +318,6 @@ poverty_pca_total <- poverty_pca_total %>% mutate(Target=as.factor(Target))
 poverty_pca_total$v2a1 <-NULL  #NA
 poverty_pca_total$v18q1 <-NULL  #NA
 poverty_pca_total$rez_esc <-NULL #NA   #33413
-#names(which(sapply(poverty_pca_total, anyNA)))
 poverty_pca_total$meaneduc <-NULL
 poverty_pca_total$SQBmeaned <-NULL
 
@@ -323,7 +369,7 @@ full_pca = prcomp(poverty_pca_numerical, center = TRUE, scale. = TRUE)
 ```
 
 ```{r}
-fviz_eig(full_pca)
+fviz_eig(full_pca, addlabels=TRUE)
 ```
 
 ```{r}
@@ -333,11 +379,12 @@ fviz_pca_var(full_pca,
              col.var = "contrib", # Color by contributions to the PC
              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
              select.var = list(contrib = 20), # top 20 contributing
-             repel = TRUE     # Avoid text overlapping
-             )
+             repel = TRUE,     # Avoid text overlapping
+             title="PCA-Plot")
 
 poverty_pca_total= poverty_pca_total %>% 
   cbind(full_pca$x[,1:10])
+
 poverty_pca_train <- subset(poverty_pca_total, tag=="Train")
 poverty_pca_test <- subset(poverty_pca_total, tag=="Test")
 poverty_pca_test$Target <-NULL
@@ -438,7 +485,7 @@ plot(impvars, main = "Variable Importance for Random Forest")
 ```
 
 
-From the variable importance plot, we can see the top 2 important variables are all about education (average years of education for adults), then followed by dependency ratio, mobile phone amounts, and the predominant material on the outside.
+From the variable importance plot, we can see the top 2 important variables are all about education (average years of education for adults), then followed by dependency ratio, mobile phone amounts, and the predominant material on the outside. In the below box plots, we can find strong relationships between these features and the label.
 
 ```{r}
 p8 <- ggplot(poverty_rf, aes(x = as.factor(Target), y = meaneduc)) +
@@ -547,7 +594,32 @@ write.csv(result,"gbm_submission.csv",row.names=FALSE)
 ```
  
 
-#logistics regression
+#Multinomial logistics regression
+
+
+In the dataset we are working on, the dependent variables have 4 different levels, instead of 2. So we use the multinomial logistics regression model.  
+
+[Confusion Matrix Interpretation]
+
+In the validation dataset, the model has a overall accuracy of 0.6482. Out of the predictions of Extreme Poverty,Moderate Porverty, Vulnerable Households and Non Vulnerable Households, we got 64.82% of the predictions correctly. 
+
+For the prediction of Extreme poverty(Class 1), the model has a sensitivity of 2.2%, a Pos Pred Value of 41.67%. This suggsts that
+
+1) Out of individuals who are actually extremely poor, we successfully predict about 2.2% of the times. The model does not perform very well in terms of this metric.
+
+2) Out of all the individuals that we predict to be extremely poor, 41.6% are actually extreme poor. 
+
+
+[Coefficient analysis]
+
+With PC1, it has a negative relationship with the poverty level. The coefficient PC1 of multinomial logistics is negative, suggesting that with PC1, individuals are more likely to be turning to the poorer level. Remember that in the EDA section, we discovered that PC1 is related with overcrowding of the household. That suggests that if household is more crowded, than the household is more likely on average to be poorer.
+
+The coefficient PC2 of multinomial logistics regression is positive, suggesting that with PC2, individuals are more likely to be turning to the non vulnerable level. And again in the EDA section, we discovered that PC2 is related with years of schooling. That suggests that with more years of schooling, the household is more likely on average to be richer. 
+
+All of the 2 coefficient analysis makes sense intuitively: When households are poorer, their homes are more likely to be crowded and they have more people in a home. When households are richer, they have longer years of schooling because they are able to afford the huge amount of tuitions and living costs. 
+
+Again when we look back to the EDA: we are able to find similar patterns. 
+
 ```{r}
 poverty_pca_multinolog <- multinom(Target ~PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10, data=poverty_pca_train_training)
 summary(poverty_pca_multinolog)
@@ -581,19 +653,44 @@ p13
 #grid.arrange(p13,p14,nrow=2)
 ```
 
-#Conclusion:<br/>
-##Which are the most important variables:<br/>
-hogar_total, # of total individuals in the household <br/>
-r4t3, Total persons in the household <br/>
-hhsize, household size<br/>
-hogar_nin, Number of children 0 to 19 in household<br/> 
-overcrowding  # persons per room<br/>
-SQBdependncy, square of dependency-the dependency that should be taken care of in a household<br/>
-Cielorazo, the area of the ceiling, indicate the quality of the house<br/>  
-Meaneduc，the degree of education<br/> 
-Qmobilephone, the quantity of cellphones<br/>
 
 
-From the boxplots that we previously drew, hogar_total, r4t3, hhsize, hogar_nin, overcrowding  # and  SQBdependncy have the negative relationship with the degree, and Cielorazo, Meaneduc, Qmobilephone have the positive relationship with the degree. Note that if the number of Target goes bigger, it indicates that people are more rich.<br/>
+##[Business recommendations]
+Based on our EDA, models and findings anlayses, we have the following recommendations in response to the business questions for the project. <br/>
 
+**1) Recommend variables that are related to schooling, household crowding, house quality, and number of cellphones owned as the most important variables from both the models and EDA analysis. **<br/>
+
+From the models we found that: <br>
+More schooling generally indicates that households are less non vunlenerable. <br/>
+schooling related variables include:<br/>
+Meaneduc，the degree of education 
+
+household crowding related variables: household being crowded generally indicates that households are more impoverished. <br/>
+r4t3, Total persons in the household;<br/>
+overcrowding  # persons per room 
+
+house quality related variables: worse house quality generally indicates that households are more impoverished <br/>
+Cielorazo, the area of the ceilin
+
+number of cellpones owned: more number of cellphones owned generally indicates that households are less non impoverished.<br/>
+Qmobilephone
+
+These interpretations from the models are very similar to the ones we got from the boxplots we previously drawn. <br/>
+
+These interpretations may seem to be very intuitive to what we usually think. But this helps us to identify the most important variables to look at when predicting poverty levels. Thus, they do provide some level of practical senses. 
+
+
+
+**2) Recommend the random forest model for the Inter-American Development Bank to identify impoverished individuals for the bank to provide the aiding programs. **
+
+As for the model overall accuracy, logistics regression has an accuracy of 64.82%, rf has an accuracy of 93.72%, Gbm rf has an accuracy of 77.7%.
+When talking about sensitivity for Class 1, logistics regression has sensitivity of 2.21%, rf has sensitivity of 78.76%, Gbm has sensitivity of 48.62%.
+As for PPV for Class 1, logistics regression has PPV of 41.67%, rf has PPV of 97.8%, Gbm has PPV of 87.23%.
+When it goes to kappa, logistics regression has kappa of 0.1892, rf has kappa of 0.883, Gbm has kappa of 0.5473.
+When it comes to the scores on Kaggle, logistics regression has 0.29, rf has 0.375, Gbm has 0.368.
+Overall, we recommend the Random Forest Model, because it has a highest accuracy, highest sensitivity(Class1), highest PPV (Class1), highest Kappa, and highest Kaggle scores.
+
+
+##[Vision of our project]  <br/>
+Our recommendations will help the Inter-American Development Bank identify the impoverished households and improve social inequality by providing sufficient aids to people who are in need of. At the same time, we are making sure that the bank is not wasting their precious aids to non-vulnerable people who do not need the money. Compared to the previous PMT model that the bank is using, our random forest model Although the project is primarily targeted at households in Costa Rica, the models can definitely be applied to other countries and regions in the future, and help the institution to expand its impact in improving inequality issues. 
 

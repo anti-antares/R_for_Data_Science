@@ -1,0 +1,209 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Data cleaning 
+```{r}
+library(tidyverse)
+library(DataExplorer)
+
+poverty_pca_pca <- read_csv(file = "Train.csv")
+poverty_pca_test <-read_csv(file ="Test.csv")
+
+
+poverty_pca$tag <-"Train"
+poverty_pca_test$tag <-"Test"
+
+poverty_pca_test $Target <-1
+poverty_pca_total <- rbind(poverty_pca,poverty_pca_test)
+poverty_pca_total <- poverty_pca_total %>% mutate(Target=as.factor(Target))
+poverty_pca_total$v2a1 <-NULL  #NA
+poverty_pca_total$v18q1 <-NULL  #NA
+poverty_pca_total$rez_esc <-NULL #NA   #33413
+#names(which(sapply(poverty_pca_total, anyNA)))
+poverty_pca_total$meaneduc <-NULL
+poverty_pca_total$SQBmeaned <-NULL
+
+poverty_pca_total$dependency <- NULL
+poverty_pca_total$idhogar <-NULL
+
+
+
+
+
+
+full = as_tibble(rbind(poverty_pca %>% select,poverty_pca_test))
+
+# Create a list of the features names that need to be reverse engineered
+
+feature_list = c(
+  "pared",
+  "piso",
+  "techo",
+  "abasta",
+  "sanitario",
+  "energcocinar",
+  "elimbasu",
+  "epared",
+  "etecho",
+  "eviv",
+  "estadocivil",
+  "parentesco",
+  "instlevel",
+  "tipovivi",
+  "lugar",
+  "area"
+)
+
+# Matrix to store our new features
+
+new_features_integer = data.frame(matrix(ncol = length(feature_list), nrow = nrow(full)))
+
+# Cycle through and reverse the OHE process for these
+
+ohe_names = vector()
+
+for(i in 1:length(feature_list)){
+  
+  # Grab the feature
+  
+  feature_to_fix = full %>% select(starts_with(feature_list[i]))
+  
+  # Fix and enter into our new feature matrix
+  
+  new_features_integer[,i] = as.integer(factor(names(feature_to_fix)[max.col(feature_to_fix)], ordered = FALSE))
+  names(new_features_integer)[i] = paste0(feature_list[i],"_int")
+  
+  ohe_names = c(ohe_names, as.vector(names(feature_to_fix)))
+  
+}
+
+# for(i in 1:length(feature_list)){
+#   poverty_pca =poverty_pca %>% select(-starts_with(feature_list[i]))
+# }
+# poverty_pca_total=as_tibble(cbind(poverty_pca , new_features_integer))
+
+```
+
+
+
+Distribution 
+room normally distributed 
+size of household left skewed
+```{r}
+##recode the variables 
+##do the distribution by categories 
+##recode完成之后 再加变量或者根据前面data 介绍部分的分类来确定要做哪些variables的distribution
+
+a<-ggplot(poverty_pca,aes(x=rooms))+geom_bar()+ylab("Count")+xlab("Number of All Rooms in the House")
+
+b<-ggplot(poverty_pca,aes(x=tamhog))+geom_bar()+ylab("Count")+xlab("Size of the Household")
+
+c<-ggplot(poverty_pca,aes(x=escolari))+geom_bar()+ylab("Count")+xlab("Years of Schooling")
+
+ggplot(new_features_integer,aes(x=pared_int))+geom_bar()+ylab("Count")
+ggplot(new_features_integer,aes(x=piso_int))+geom_bar()+ylab("Count")
+
+grid.arrange(a,b,c, nrow = 3,top="Distribution Analysis")
+```
+
+PCA
+
+the first 10 variables explain ...% of the variances.
+According to the graph, the most 
+
+explain what are PC1 and PC2 
+
+pc1:
+hogar_total, # of total individuals in the household
+r4t3, Total persons in the household
+hhsize, household size
+...
+
+pc2: 
+cielorazo, =1 if the house has ceiling
+r4m2, Females 12 years of age and older
+....
+
+```{r}
+
+poverty_pca_numerical = poverty_pca_total %>% select_if(is.numeric)  ## get the numerical columns 
+poverty_pca_numerical$elimbasu5 <- NULL
+
+full_pca = prcomp(poverty_pca_numerical, center = TRUE, scale. = TRUE)
+library(factoextra)
+fviz_eig(full_pca)
+
+
+fviz_pca_var(full_pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             select.var = list(contrib = 20), # top 20 contributing
+             repel = TRUE     # Avoid text overlapping
+             )
+
+# view <- full_pca$rotation
+# to view how to interpret the coefficients 
+# might be too many 
+
+```
+
+
+Some additional data handling 
+
+```{r}
+
+
+poverty_pca_total= poverty_pca_total %>% 
+  cbind(full_pca$x[,1:10])
+poverty_pca_train <- subset(poverty_pca_total, tag=="Train")
+poverty_pca_test <- subset(poverty_pca_total, tag=="Test")
+poverty_pca_test$Target <-NULL
+
+```
+
+
+
+
+
+split data 
+```{r}
+seed <-100
+set.seed(seed)
+inTraining <-createDataPartition(poverty_pca_train$Target,p=0.7,list=FALSE)
+poverty_pca_train_training = poverty_pca_train[inTraining,]
+poverty_pca_train_validation = poverty_pca_train[-inTraining,]
+
+```
+
+
+
+Multi_nomial
+```{r}
+
+library(nnet)
+library(caret)
+
+poverty_pca_multinolog <- multinom(Target ~PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10, data=poverty_pca_train_training)
+summary(poverty_pca_multinolog)
+
+poverty_pca_log_prediction_train <- predict(object = poverty_pca_multinolog, newdata = poverty_pca_train_training) 
+## table(actual = poverty_pca_train$Target, predict = poverty_pca_log_prediction_train)
+## confusionMatrix(poverty_pca_log_prediction_train, poverty_pca_train$Target)
+
+poverty_pca_log_prediction_validation <- predict(object = poverty_pca_multinolog, newdata =poverty_pca_train_validation)
+confusionMatrix(poverty_pca_log_prediction_validation, poverty_pca_train_validation$Target)
+
+poverty_pca_log_prediction_test <- predict(object = poverty_pca_multinolog, newdata =poverty_pca_test)
+
+
+result <-data.frame(poverty_pca_test$Id,poverty_pca_log_prediction_test)
+colnames(result) <-c("Id","Target")
+write.csv(result,"submission_shuting.csv",row.names = FALSE)
+
+
+```
+
+
+
