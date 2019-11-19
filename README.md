@@ -3,7 +3,7 @@
 This is the final project for CMU 18 Fall 95_778 R for Data Science.
 Group members: Zhexin Chen, Shuting You and Xiaodi Tao.
 
-#Explain data we chose
+# Explain data we chose
 
 
 The datasets contain 142 features and 1 label (only for the training set). The datasets give comprehensive description of a household surveyed, and the features contain information about several aspects of important information of a household: including household finance, household items, house condition, family composition, education, and basic demographics. 
@@ -56,7 +56,7 @@ lugar5, =1 region Huetar AtlÃƒÂ¡ntica
 lugar6, =1 region Huetar Norte
 
 
-#Business Question
+# Business Question
 
 
 Business Problem Overview: 
